@@ -21,29 +21,63 @@ bật máy lên là hệ thống tự chạy lại, trừ khi bạn đã chủ �
 
 ## Luồng chạy
 
+Lịch do **systemd** điều phối (không phải n8n), để máy được **tự đánh thức → chạy job → ngủ lại**:
+
 ```
-22:55        07 · Apify: đồng bộ quota (đã dùng, hạn mức, ngày reset)
-23:00        01 · Maps: gửi job crawl
-             plan_crawl_jobs() → chọn CRAWL_JOBS_PER_RUN cặp ngành × khu vực chưa crawl trong 30 ngày
-             gửi sang gosom (depth GMAPS_DEPTH, có lấy email) → lưu external_id
-23:00–05:55  03 · Maps: thu kết quả (5 phút/lần)
-             job nào xong → tải CSV → chuyển sang JSON → ingest_places()
-             (chuẩn hoá SĐT, lọc email rác, chống trùng theo placeId, chấm điểm) → xoá job bên gosom
-01:00        02 · Audit website
-       Lấy business có website thật → thử HTTPS → nếu lỗi thử HTTP
-       Phân tích HTML: SSL, viewport (responsive), năm copyright, CMS, email/SĐT/fanpage/Zalo
-       save_audit() + rescore()
+SCHEDULE_TIMES (mặc định 10:00)  lead-hunter.timer đánh thức máy (WakeSystem=true)
+  scripts/run-pipeline.sh  (chặn sleep và "gập nắp là sleep" trong lúc chạy)
+    07 đồng bộ quota Apify → 01 gửi job Maps (gosom) → 05 gửi job Facebook (Apify)
+    chờ 03/06 thu hết kết quả (n8n, 5 phút/lần, chạy cả ngày)
+    02 audit website → 04 enrich fanpage
+  scripts/after-run.sh
+    nếu máy do timer đánh thức VÀ màn hình còn khoá hoặc nắp đang gập → cho máy ngủ lại
+    nếu bạn đang dùng máy → giữ nguyên
 ```
 
-23:05        05 · Facebook: tìm lead mới - gửi job (apify/facebook-search-scraper)
-23:00–05:55  06 · Facebook: thu kết quả (5 phút/lần) → ingest_facebook_search()
-             gộp với lead có sẵn nếu trùng fanpage hoặc SĐT, ghi chi phí thật của run
-02:00        04 · Facebook: enrich fanpage (Apify)
-             lấy FB_PAGES_PER_RUN lead có fanpage (điểm cao trước, chưa enrich trong 90 ngày)
-             apify/facebook-pages-scraper → follower, email, SĐT, website, có đang chạy quảng cáo không
-             save_facebook() → thêm liên hệ + chấm lại điểm
+- Bỏ qua lượt chạy nếu: đang dùng pin dưới `SCHEDULE_MIN_BATTERY`%, hoặc bạn đã `docker compose stop`.
+- Job chưa xong sau `SCHEDULE_MAX_WAIT_MIN` phút: máy vẫn ngủ lại, 03/06 thu tiếp ở lần thức sau.
+  Job Apify giữ được 3 ngày (Apify lưu kết quả 7 ngày) nên không mất kết quả đã trả tiền.
+- Trong n8n chỉ 03 và 06 ở trạng thái Active. 01, 02, 04, 05, 07 không có lịch, do systemd gọi.
 
-Lead đạt **≥ 60 điểm** tự chuyển từ `new` sang `to_contact`.
+```bash
+# Đổi giờ chạy: sửa SCHEDULE_TIMES trong .env (vd 10:00 hoặc 09:00,13:00,17:00) rồi:
+scripts/install-scheduler.sh
+systemctl list-timers lead-hunter.timer        # lượt chạy kế tiếp
+journalctl -u lead-hunter -n 50                # log các lượt chạy
+sudo systemctl start lead-hunter               # chạy ngay 1 lượt
+sudo env DRY_RUN=1 scripts/run-pipeline.sh     # xem kế hoạch, không gửi job, không tốn credit
+scripts/install-scheduler.sh --uninstall       # gỡ lịch
+```
+
+Nhiều giờ/ngày: ngân sách Apify và `google_max_per_run` tự chia đều cho các lượt (`settings.runs_per_day`).
+
+## Dashboard & view
+
+**Metabase** (http://localhost:3000 → collection *Lead Hunter* → dashboard *Lead Hunter*): 6 tab, 45 biểu đồ.
+Bộ lọc trên cùng (Ngành, Khu vực, Nguồn, Ngày tìm thấy) áp dụng cho mọi biểu đồ dựa trên lead.
+
+| Tab | Nội dung |
+|---|---|
+| 📊 Tổng quan | KPI, lead mới theo ngày, phân bố điểm, trạng thái, loại website, top 30 lead nóng |
+| 🏷 Ngành & khu vực | Bảng 14 chỉ số theo ngành, cơ hội theo ngành, bảng khu vực, bản đồ |
+| 🌐 Chất lượng website | Web chết, không SSL, không mobile, copyright cũ, CMS, danh sách web dễ chốt làm lại |
+| 🤝 Pipeline bán hàng | Funnel, hoạt động liên hệ theo ngày, tỉ lệ chuyển đổi theo ngành, lịch gọi lại |
+| 📘 Facebook & Apify | Ngân sách Apify (đã dùng, còn lại, mỗi lượt, ngày reset), chi phí luỹ kế, follower, so sánh nguồn |
+| ⚙️ Vận hành | Kế hoạch lượt tới, job theo ngày, hiệu suất crawler, độ phủ ngành × khu vực, 30 job gần nhất |
+
+Dữ liệu lấy từ các view `a_*` trong `db/06-analytics.sql` (`a_leads` là bảng phẳng mỗi lead một dòng).
+
+**NocoDB** (http://localhost:8090 → base *Lead Hunter* → bảng `businesses`):
+
+| Nhóm | View |
+|---|---|
+| Gọi khách | 📞 Cần gọi · 🔥 Rất nóng (80+) · 🆕 Mới 7 ngày qua · 🔄 Đang theo dõi · 📅 Lịch gọi lại (Calendar theo `next_call_at`) |
+| Theo cơ hội | 🚫 Chưa có website · 📱 Chỉ có fanpage / MXH · 🐢 Web cũ / lỗi · 📣 Đang chạy quảng cáo FB · ✉️ Có email |
+| Theo nguồn / nhóm | 🗺 Nguồn: Google Maps · 📘 Nguồn: Facebook · 🏷 Theo ngành · 📍 Theo khu vực |
+| Kết quả | ✅ Đã chốt · ❌ Thất bại / bỏ qua · 📋 Pipeline (Kanban) · 🖼 Thẻ lead (Gallery) · 🗂 Tất cả lead |
+| Bảng phụ | `crawl_jobs` → 🛠 Lịch sử job · `industries` → 🎯 Theo priority |
+
+Hẹn gọi lại: điền cột `next_call_at` → lead hiện trên 📅 Lịch gọi lại và bảng "Lịch gọi lại sắp tới" trên Metabase.
 
 ## Cấu hình chạy (sửa trong NocoDB, không cần restart)
 
@@ -98,7 +132,7 @@ docker compose down                  # tắt (giữ dữ liệu)
 docker compose restart n8n           # sau khi sửa .env
 docker compose exec n8n sh /import/import.sh   # import lại workflow sau khi sửa file JSON
 
-# Chạy workflow từ terminal (không cần mở UI)
+# Chạy riêng từng workflow từ terminal (không cần mở UI)
 lhx() { docker compose exec -e N8N_RUNNERS_BROKER_PORT=5690 -e QUEUE_HEALTH_CHECK_PORT=5691 n8n n8n execute --id "$1"; }
 lhx LhCrawlMaps00001     # 01 Maps: gửi job
 lhx LhCollectMaps001     # 03 Maps: thu kết quả (chạy lại sau vài phút nếu job chưa xong)

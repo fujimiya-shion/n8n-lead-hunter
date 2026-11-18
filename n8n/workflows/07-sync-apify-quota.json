@@ -19,26 +19,6 @@
       "parameters": {}
     },
     {
-      "id": "g1b2c3d4-0007-4000-8000-000000000002",
-      "name": "Mỗi tối 22:55",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        200
-      ],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "55 22 * * *"
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "g1b2c3d4-0007-4000-8000-000000000003",
       "name": "Lấy quota Apify",
       "type": "n8n-nodes-base.httpRequest",
@@ -101,17 +81,6 @@
   ],
   "connections": {
     "Chạy thủ công": {
-      "main": [
-        [
-          {
-            "node": "Lấy quota Apify",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mỗi tối 22:55": {
       "main": [
         [
           {

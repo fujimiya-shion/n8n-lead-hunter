@@ -19,26 +19,6 @@
       "parameters": {}
     },
     {
-      "id": "e1b2c3d4-0005-4000-8000-000000000002",
-      "name": "Mỗi tối 23:05",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        200
-      ],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "5 23 * * *"
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "e1b2c3d4-0005-4000-8000-000000000003",
       "name": "Lên job Facebook",
       "type": "n8n-nodes-base.postgres",
@@ -144,17 +124,6 @@
   ],
   "connections": {
     "Chạy thủ công": {
-      "main": [
-        [
-          {
-            "node": "Lên job Facebook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mỗi tối 23:05": {
       "main": [
         [
           {

@@ -2,24 +2,40 @@
   "id": "LhFbSearchColl01",
   "name": "06 · Facebook: tìm lead mới - thu kết quả (Apify)",
   "active": false,
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Ho_Chi_Minh" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
   "nodes": [
     {
       "id": "f1b2c3d4-0006-4000-8000-000000000001",
       "name": "Chạy thủ công",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "parameters": {}
     },
     {
       "id": "f1b2c3d4-0006-4000-8000-000000000002",
-      "name": "5 phút/lần (23h–5h)",
+      "name": "5 phút/lần (cả ngày)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 200],
+      "position": [
+        0,
+        200
+      ],
       "parameters": {
-        "rule": { "interval": [ { "field": "cronExpression", "expression": "*/5 23,0-5 * * *" } ] }
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
       }
     },
     {
@@ -27,28 +43,46 @@
       "name": "Run đang chạy",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [240, 100],
+      "position": [
+        240,
+        100
+      ],
       "parameters": {
         "operation": "executeQuery",
         "query": "SELECT id AS job_id, external_id\nFROM crawl_jobs\nWHERE status = 'running' AND source = 'apify_facebook' AND external_id IS NOT NULL\nORDER BY id;",
         "options": {}
       },
-      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
     },
     {
       "id": "f1b2c3d4-0006-4000-8000-000000000004",
       "name": "Hỏi trạng thái run",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 100],
+      "position": [
+        480,
+        100
+      ],
       "onError": "continueRegularOutput",
       "parameters": {
         "url": "=https://api.apify.com/v2/actor-runs/{{ $json.external_id }}",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.APIFY_TOKEN }}" } ]
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.APIFY_TOKEN }}"
+            }
+          ]
         },
-        "options": { "timeout": 20000 }
+        "options": {
+          "timeout": 20000
+        }
       }
     },
     {
@@ -56,7 +90,10 @@
       "name": "Theo trạng thái",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
-      "position": [720, 100],
+      "position": [
+        720,
+        100
+      ],
       "parameters": {
         "rules": {
           "values": [
@@ -64,10 +101,23 @@
               "outputKey": "xong",
               "renameOutput": true,
               "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
                 "combinator": "and",
                 "conditions": [
-                  { "id": "r1", "leftValue": "={{ $json.data?.status }}", "rightValue": "SUCCEEDED", "operator": { "type": "string", "operation": "equals" } }
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.data?.status }}",
+                    "rightValue": "SUCCEEDED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
                 ]
               }
             },
@@ -75,10 +125,23 @@
               "outputKey": "lỗi",
               "renameOutput": true,
               "conditions": {
-                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
                 "combinator": "and",
                 "conditions": [
-                  { "id": "r2", "leftValue": "={{ $json.data?.status ?? '' }}", "rightValue": "^(FAILED|ABORTED|TIMED-OUT)$", "operator": { "type": "string", "operation": "regex" } }
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.data?.status ?? '' }}",
+                    "rightValue": "^(FAILED|ABORTED|TIMED-OUT)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
                 ]
               }
             }
@@ -92,17 +155,30 @@
       "name": "Tải kết quả",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 0],
+      "position": [
+        960,
+        0
+      ],
       "onError": "continueErrorOutput",
       "parameters": {
         "url": "=https://api.apify.com/v2/datasets/{{ $json.data.defaultDatasetId }}/items?clean=true&format=json",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.APIFY_TOKEN }}" } ]
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.APIFY_TOKEN }}"
+            }
+          ]
         },
         "options": {
           "timeout": 60000,
-          "response": { "response": { "responseFormat": "text", "outputPropertyName": "data" } }
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
         }
       }
     },
@@ -111,54 +187,140 @@
       "name": "Lưu lead vào DB",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [1200, 0],
+      "position": [
+        1200,
+        0
+      ],
       "onError": "continueErrorOutput",
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT ingest_facebook_search($1::bigint, $2::jsonb, $3::numeric) AS result;",
+        "query": "SELECT ingest_facebook_search($1::bigint, $2::jsonb, $3::numeric) AS result FROM crawl_jobs WHERE id = $1::bigint AND status = 'running';",
         "options": {
           "queryReplacement": "={{ [ $('Run đang chạy').item.json.job_id, $json.data, $('Hỏi trạng thái run').item.json.data.usageTotalUsd ?? 0 ] }}"
         }
       },
-      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
     },
     {
       "id": "f1b2c3d4-0006-4000-8000-000000000008",
       "name": "Đánh dấu job lỗi",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [1200, 240],
+      "position": [
+        1200,
+        240
+      ],
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE crawl_jobs SET status = 'failed', error = left($2, 2000), cost_usd = $3::numeric, finished_at = now() WHERE id = $1::bigint;",
+        "query": "UPDATE crawl_jobs SET status = 'failed', error = left($2, 2000), cost_usd = $3::numeric, finished_at = now() WHERE id = $1::bigint AND status = 'running';",
         "options": {
           "queryReplacement": "={{ [ $('Run đang chạy').item.json.job_id, JSON.stringify($json.error ?? $json.data?.statusMessage ?? $json), $('Hỏi trạng thái run').item.json.data?.usageTotalUsd ?? 0 ] }}"
         }
       },
-      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
     }
   ],
   "connections": {
-    "Chạy thủ công": { "main": [ [ { "node": "Run đang chạy", "type": "main", "index": 0 } ] ] },
-    "5 phút/lần (23h–5h)": { "main": [ [ { "node": "Run đang chạy", "type": "main", "index": 0 } ] ] },
-    "Run đang chạy": { "main": [ [ { "node": "Hỏi trạng thái run", "type": "main", "index": 0 } ] ] },
-    "Hỏi trạng thái run": { "main": [ [ { "node": "Theo trạng thái", "type": "main", "index": 0 } ] ] },
+    "Chạy thủ công": {
+      "main": [
+        [
+          {
+            "node": "Run đang chạy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run đang chạy": {
+      "main": [
+        [
+          {
+            "node": "Hỏi trạng thái run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hỏi trạng thái run": {
+      "main": [
+        [
+          {
+            "node": "Theo trạng thái",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Theo trạng thái": {
       "main": [
-        [ { "node": "Tải kết quả", "type": "main", "index": 0 } ],
-        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Tải kết quả",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Đánh dấu job lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Tải kết quả": {
       "main": [
-        [ { "node": "Lưu lead vào DB", "type": "main", "index": 0 } ],
-        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Lưu lead vào DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Đánh dấu job lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Lưu lead vào DB": {
       "main": [
         [],
-        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Đánh dấu job lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 phút/lần (cả ngày)": {
+      "main": [
+        [
+          {
+            "node": "Run đang chạy",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

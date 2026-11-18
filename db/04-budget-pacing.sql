@@ -11,8 +11,9 @@
 DELETE FROM settings WHERE key IN ('leads_per_run', 'fb_enrich_per_run', 'fb_overflow_to_google', 'google_pct');
 
 INSERT INTO settings (key, value, description) VALUES
-  ('google_max_per_run',    '100', 'Số lead Google mỗi đêm (miễn phí). Giới hạn để không bị Google chặn IP: ~20 lead/job, ~3-5 phút/job'),
+  ('google_max_per_run',    '100', 'Số lead Google mỗi ngày (miễn phí), chia đều cho các lượt chạy. Giới hạn để không bị Google chặn IP: ~20 lead/job, ~3-5 phút/job'),
   ('fb_monthly_budget_usd', '5',   'Ngân sách Apify tối đa mỗi chu kỳ (USD). Lấy giá trị nhỏ hơn giữa số này và hạn mức thật của Apify'),
+  ('runs_per_day',          '1',   '(tự động) Số lượt chạy mỗi ngày, do scripts/install-scheduler.sh ghi theo SCHEDULE_TIMES'),
   ('fb_enrich_share_pct',   '20',  '% ngân sách mỗi đêm dành để enrich fanpage của lead Google. Phần còn lại dùng để tìm lead Facebook mới'),
   ('apify_usage_usd',       '',    '(tự động) Số tiền đã dùng trong chu kỳ, lấy từ Apify'),
   ('apify_limit_usd',       '',    '(tự động) Hạn mức chu kỳ của tài khoản Apify'),
@@ -21,7 +22,7 @@ INSERT INTO settings (key, value, description) VALUES
   ('apify_synced_at',       '',    '(tự động) Lần cuối đồng bộ với Apify')
 ON CONFLICT (key) DO NOTHING;
 
-UPDATE settings SET description = 'Số lead Google mỗi đêm (miễn phí). Giới hạn để không bị Google chặn IP: ~20 lead/job, ~3-5 phút/job'
+UPDATE settings SET description = 'Số lead Google mỗi ngày (miễn phí), chia đều cho các lượt chạy. Giới hạn để không bị Google chặn IP: ~20 lead/job, ~3-5 phút/job'
 WHERE key = 'google_max_per_run';
 
 CREATE OR REPLACE FUNCTION setting_text(k text) RETURNS text
@@ -86,14 +87,16 @@ DECLARE
   v_nights int;
   v_night  numeric;
   v_share  numeric := least(greatest(coalesce(setting_num('fb_enrich_share_pct'), 0), 0), 100) / 100.0;
-  v_gmax   int := coalesce(setting_num('google_max_per_run'), 100);
+  v_runs   int := greatest(coalesce(setting_num('runs_per_day'), 1), 1)::int;
+  v_gmax   int := ceil(coalesce(setting_num('google_max_per_run'), 100) / v_runs);
   v_f int; v_e int; v_g int;
 BEGIN
   -- Chu kỳ đã qua mà chưa đồng bộ lại: coi như quota mới
   IF v_reset < now() THEN v_reset := v_reset + interval '1 month'; END IF;
 
   v_left   := greatest(v_budget - fb_spent_this_month(), 0);
-  v_nights := greatest(ceil(extract(epoch FROM (v_reset - now())) / 86400.0)::int, 1);
+  -- Số lượt còn lại tới ngày reset = số ngày còn lại × số lượt mỗi ngày
+  v_nights := greatest(ceil(extract(epoch FROM (v_reset - now())) / 86400.0)::int, 1) * v_runs;
   v_night  := v_left / v_nights;
 
   -- Facebook: tiêu đều quota Apify còn lại tới ngày reset

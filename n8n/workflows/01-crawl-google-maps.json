@@ -19,26 +19,6 @@
       "parameters": {}
     },
     {
-      "id": "a1b2c3d4-0001-4000-8000-000000000002",
-      "name": "Mỗi tối 23:00",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        200
-      ],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 23 * * *"
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "a1b2c3d4-0001-4000-8000-000000000003",
       "name": "Lên job crawl",
       "type": "n8n-nodes-base.postgres",
@@ -135,17 +115,6 @@
   ],
   "connections": {
     "Chạy thủ công": {
-      "main": [
-        [
-          {
-            "node": "Lên job crawl",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mỗi tối 23:00": {
       "main": [
         [
           {

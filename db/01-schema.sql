@@ -49,7 +49,9 @@ CREATE TABLE businesses (
   status         lead_status NOT NULL DEFAULT 'new',
   note           text,
   contacted_at   timestamptz,
+  next_call_at   timestamptz,                -- hẹn gọi lại (view Lịch trong NocoDB)
   -- ===== tự tính bởi rescore() =====
+  industry_name  text,                       -- tên ngành (để nhóm trong NocoDB)
   score          int NOT NULL DEFAULT 0,
   score_reasons  text,
   phone          text,                      -- SĐT gọi được (dạng 0xxx), không phải 1900/1800
@@ -307,7 +309,7 @@ END $$;
 CREATE OR REPLACE FUNCTION fail_crawl_job(p_job_id bigint, p_error text)
 RETURNS void LANGUAGE sql AS $$
   UPDATE crawl_jobs SET status = 'failed', error = left(p_error, 2000), finished_at = now()
-  WHERE id = p_job_id;
+  WHERE id = p_job_id AND status = 'running';
 $$;
 
 -- =====================================================================
@@ -464,7 +466,7 @@ BEGIN
       (array_agg(value_normalized ORDER BY id) FILTER (WHERE type = 'facebook'))[1] AS fb
     FROM contacts GROUP BY business_id
   ), r AS (
-    SELECT b.id, c.phone, c.hotline, c.emails, c.fb,
+    SELECT b.id, c.phone, c.hotline, c.emails, c.fb, i.keyword AS industry_kw,
       array_remove(ARRAY[
         CASE b.website_type
           WHEN 'none'        THEN 'Chưa có website (+40)'
@@ -498,6 +500,7 @@ BEGIN
   )
   UPDATE businesses b SET
     score         = s.score,
+    industry_name = s.industry_kw,
     score_reasons = array_to_string(s.reasons, ' · '),
     phone         = phone_display(s.phone),
     hotline       = s.hotline,

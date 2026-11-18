@@ -81,9 +81,11 @@ RETURNS TABLE (job_id bigint, keyword text, location_name text, location_query t
 LANGUAGE plpgsql AS $$
 DECLARE t record; v_target int; v_per_job int; v_jobs int;
 BEGIN
-  -- job "running" quá 3 giờ coi như hỏng
+  -- job "running" quá lâu coi như hỏng: gosom 3 giờ; Apify 3 ngày (Apify giữ kết quả 7 ngày,
+  -- máy ngủ lâu thì 03/06 vẫn thu được khi thức dậy)
   UPDATE crawl_jobs SET status = 'failed', error = 'stale', finished_at = now()
-  WHERE status = 'running' AND started_at < now() - interval '3 hours';
+  WHERE status = 'running'
+    AND started_at < now() - CASE WHEN source LIKE 'apify_%' THEN interval '3 days' ELSE interval '3 hours' END;
 
   SELECT * INTO t FROM run_targets();
   IF p_source = 'gosom_maps' THEN
