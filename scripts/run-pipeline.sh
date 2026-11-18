@@ -37,6 +37,16 @@ if [ "${AC:-1}" = "0" ] && [ -n "${BAT:-}" ] && [ "$BAT" -lt "$MIN_BATTERY" ]; t
   log "Đang dùng pin ${BAT}% < ${MIN_BATTERY}% → bỏ qua lượt này"; exit 0
 fi
 
+# Máy vừa khởi động (lượt chạy bù sau shutdown): chờ Docker bật lại container, tối đa 3 phút
+UPTIME_S=$(cut -d. -f1 /proc/uptime)
+if [ "$UPTIME_S" -lt 600 ]; then
+  log "Máy mới khởi động ${UPTIME_S}s → chờ container sẵn sàng"
+  for i in $(seq 1 36); do
+    [ -n "$(docker compose ps -q --status running n8n 2>/dev/null)" ] && break
+    sleep 5
+  done
+fi
+
 # Bạn đã chủ động tắt hệ thống (docker compose stop) → tôn trọng, không chạy
 if [ -z "$(docker compose ps -q --status running n8n 2>/dev/null)" ]; then
   log "n8n đang tắt (docker compose stop?) → bỏ qua lượt này"; exit 0
