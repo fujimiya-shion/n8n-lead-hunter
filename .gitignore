@@ -1,0 +1,43 @@
+# ===== Bí mật =====
+# .env chứa mật khẩu DB, N8N_ENCRYPTION_KEY, APIFY_TOKEN → tuyệt đối không commit
+.env
+.env.*
+!.env.example
+
+# ===== Dữ liệu / backup =====
+# Dữ liệu thật nằm trong Docker volume, nhưng backup tạo bằng pg_dump hay export thì không commit
+backup-*.sql
+*.dump
+*.sql.gz
+*.csv
+exports/
+
+# Nếu sau này chuyển volume sang bind mount trong thư mục project
+data/
+pg_data/
+n8n_data/
+gmaps_data/
+nocodb_data/
+
+# ===== n8n =====
+# Workflow export thủ công từ UI có thể chứa credential đã giải mã
+n8n/credentials*.json
+n8n/**/*.decrypted.json
+
+# ===== Log / tạm =====
+*.log
+logs/
+tmp/
+.cache/
+
+# ===== Editor / OS =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== Claude Code (cấu hình cá nhân) =====
+.claude/settings.local.json

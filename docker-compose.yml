@@ -1,0 +1,104 @@
+name: lead-hunter
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
+    ports:
+      - "127.0.0.1:${FORWARD_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FORWARD_N8N_PORT:-5678}:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      GENERIC_TIMEZONE: ${TZ}
+      TZ: ${TZ}
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      N8N_RUNNERS_ENABLED: "true"
+      # Biến cho workflow
+      APIFY_TOKEN: ${APIFY_TOKEN}
+      # Dùng cho script import credential lần đầu
+      LH_PG_USER: ${POSTGRES_USER}
+      LH_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      LH_PG_DB: ${POSTGRES_DB}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/import:ro,Z
+
+  gmaps:
+    # Google Maps scraper mã nguồn mở, miễn phí: https://github.com/gosom/google-maps-scraper
+    image: gosom/google-maps-scraper:latest
+    restart: unless-stopped
+    command: ["-web", "-data-folder", "/gmapsdata", "-c", "${GMAPS_CONCURRENCY:-4}"]
+    ports:
+      - "127.0.0.1:${FORWARD_GMAPS_PORT:-8081}:8080"   # giao diện web của scraper
+    volumes:
+      - gmaps_data:/gmapsdata
+
+  nocodb:
+    image: nocodb/nocodb:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FORWARD_NOCODB_PORT:-8090}:8080"
+    environment:
+      NC_DB: pg://postgres:5432?u=${POSTGRES_USER}&p=${POSTGRES_PASSWORD}&d=nocodb
+      NC_DISABLE_TELE: "true"
+      # Cho phép NocoDB kết nối tới Postgres trong cùng mạng Docker (chỉ mở trên localhost)
+      NC_ALLOW_LOCAL_EXTERNAL_DBS: "true"
+      TZ: ${TZ}
+    volumes:
+      - nocodb_data:/usr/app/data
+
+  metabase:
+    image: metabase/metabase:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FORWARD_METABASE_PORT:-3000}:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: metabase
+      MB_DB_USER: ${POSTGRES_USER}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_ANON_TRACKING_ENABLED: "false"
+      JAVA_TIMEZONE: ${TZ}
+      JAVA_OPTS: "-Xmx1g"
+
+volumes:
+  gmaps_data:
+  pg_data:
+  n8n_data:
+  nocodb_data:

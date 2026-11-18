@@ -1,0 +1,198 @@
+{
+  "id": "LhFbSearchSend01",
+  "name": "05 · Facebook: tìm lead mới - gửi job (Apify)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "nodes": [
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000001",
+      "name": "Chạy thủ công",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000002",
+      "name": "Mỗi tối 23:05",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 23 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000003",
+      "name": "Lên job Facebook",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM plan_crawl_jobs('apify_facebook');",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000004",
+      "name": "Bắt đầu run Apify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~facebook-search-scraper/runs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.APIFY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ categories: [$json.keyword + ' ' + $json.location_name], locations: [$json.fb_city], searchType: 'pages-google', resultsLimit: $json.max_results }) }}",
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Lưu id run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        740,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crawl_jobs SET external_id = $2 WHERE id = $1::bigint RETURNING id, external_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lên job Facebook').item.json.job_id, $json.data.id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "e1b2c3d4-0005-4000-8000-000000000006",
+      "name": "Đánh dấu job lỗi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        740,
+        220
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crawl_jobs SET status = 'failed', error = left($2, 2000), cost_usd = 0, finished_at = now() WHERE id = $1::bigint;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lên job Facebook').item.json.job_id, JSON.stringify($json.error ?? $json) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chạy thủ công": {
+      "main": [
+        [
+          {
+            "node": "Lên job Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mỗi tối 23:05": {
+      "main": [
+        [
+          {
+            "node": "Lên job Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lên job Facebook": {
+      "main": [
+        [
+          {
+            "node": "Bắt đầu run Apify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bắt đầu run Apify": {
+      "main": [
+        [
+          {
+            "node": "Lưu id run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Đánh dấu job lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "id": "LhSyncApifyQta1",
+  "name": "07 · Apify: đồng bộ quota (chạy trước mọi job)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "nodes": [
+    {
+      "id": "g1b2c3d4-0007-4000-8000-000000000001",
+      "name": "Chạy thủ công",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "g1b2c3d4-0007-4000-8000-000000000002",
+      "name": "Mỗi tối 22:55",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "55 22 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "g1b2c3d4-0007-4000-8000-000000000003",
+      "name": "Lấy quota Apify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "url": "https://api.apify.com/v2/users/me/limits",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.APIFY_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "g1b2c3d4-0007-4000-8000-000000000004",
+      "name": "Lưu quota",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT sync_apify_limits($1::jsonb) AS quota;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "g1b2c3d4-0007-4000-8000-000000000005",
+      "name": "Không lấy được (giữ số cũ)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        220
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Chạy thủ công": {
+      "main": [
+        [
+          {
+            "node": "Lấy quota Apify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mỗi tối 22:55": {
+      "main": [
+        [
+          {
+            "node": "Lấy quota Apify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lấy quota Apify": {
+      "main": [
+        [
+          {
+            "node": "Lưu quota",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Không lấy được (giữ số cũ)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

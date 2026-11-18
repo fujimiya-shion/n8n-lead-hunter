@@ -1,0 +1,211 @@
+{
+  "id": "LhEnrichFbPage01",
+  "name": "04 · Facebook: enrich fanpage (Apify)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "nodes": [
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000001",
+      "name": "Chạy thủ công",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000002",
+      "name": "Mỗi đêm 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000003",
+      "name": "Lấy fanpage cần enrich",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_agg(jsonb_build_object('id', id, 'url', facebook_url)) AS pages, count(*) AS n\nFROM (\n  SELECT b.id, b.facebook_url\n  FROM businesses b\n  LEFT JOIN facebook_pages f ON f.business_id = b.id\n  WHERE b.facebook_url IS NOT NULL\n    AND b.status IN ('new', 'to_contact')\n    AND (f.business_id IS NULL OR f.scraped_at < now() - interval '90 days')\n  ORDER BY b.score DESC, b.review_count DESC\n  LIMIT (SELECT fb_enrich_limit FROM run_targets())\n) x\nHAVING count(*) > 0;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Apify Facebook Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~facebook-pages-scraper/run-sync-get-dataset-items?timeout=300&clean=true&format=json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.APIFY_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ startUrls: $json.pages.map(p => ({ url: p.url })) }) }}",
+        "options": {
+          "timeout": 330000,
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000005",
+      "name": "Lưu dữ liệu fanpage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        740,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT save_facebook($1::jsonb, $2::jsonb) AS result;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($('Lấy fanpage cần enrich').item.json.pages), $json.data ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "d1b2c3d4-0004-4000-8000-000000000006",
+      "name": "Ghi lỗi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1000,
+        220
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO crawl_jobs (source, status, error, finished_at) VALUES ('apify_fb_enrich', 'failed', $1, now()) RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.error ?? $json).slice(0, 2000) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chạy thủ công": {
+      "main": [
+        [
+          {
+            "node": "Lấy fanpage cần enrich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mỗi đêm 02:00": {
+      "main": [
+        [
+          {
+            "node": "Lấy fanpage cần enrich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lấy fanpage cần enrich": {
+      "main": [
+        [
+          {
+            "node": "Apify Facebook Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify Facebook Pages": {
+      "main": [
+        [
+          {
+            "node": "Lưu dữ liệu fanpage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ghi lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lưu dữ liệu fanpage": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Ghi lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

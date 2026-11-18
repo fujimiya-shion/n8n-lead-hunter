@@ -1,0 +1,182 @@
+{
+  "id": "LhCollectMaps001",
+  "name": "03 · Maps: thu kết quả (gosom)",
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Ho_Chi_Minh" },
+  "nodes": [
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000001",
+      "name": "Chạy thủ công",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000002",
+      "name": "5 phút/lần (23h–5h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 200],
+      "parameters": {
+        "rule": { "interval": [ { "field": "cronExpression", "expression": "*/5 23,0-5 * * *" } ] }
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Job đang chạy",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [240, 100],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id AS job_id, external_id\nFROM crawl_jobs\nWHERE status = 'running' AND source = 'gosom_maps' AND external_id IS NOT NULL\nORDER BY id;",
+        "options": {}
+      },
+      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000004",
+      "name": "Hỏi trạng thái",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 100],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "url": "=http://gmaps:8080/api/v1/jobs/{{ $json.external_id }}",
+        "options": { "timeout": 15000 }
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000005",
+      "name": "Theo trạng thái",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [720, 100],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "xong",
+              "renameOutput": true,
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "combinator": "and",
+                "conditions": [
+                  { "id": "r1", "leftValue": "={{ $json.Status }}", "rightValue": "ok", "operator": { "type": "string", "operation": "equals" } }
+                ]
+              }
+            },
+            {
+              "outputKey": "lỗi",
+              "renameOutput": true,
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "combinator": "and",
+                "conditions": [
+                  { "id": "r2", "leftValue": "={{ $json.Status }}", "rightValue": "failed", "operator": { "type": "string", "operation": "equals" } }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000006",
+      "name": "Tải CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "url": "=http://gmaps:8080/api/v1/jobs/{{ $('Job đang chạy').item.json.external_id }}/download",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "text", "outputPropertyName": "data" } }
+        }
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000007",
+      "name": "CSV → JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Chuyển CSV của gosom sang cùng format với Apify để dùng chung hàm ingest_places()\nfunction parseCSV(t) {\n  const rows = []; let row = [], f = '', q = false;\n  for (let i = 0; i < t.length; i++) {\n    const c = t[i];\n    if (q) {\n      if (c === '\"') { if (t[i + 1] === '\"') { f += '\"'; i++; } else q = false; }\n      else f += c;\n    } else if (c === '\"') q = true;\n    else if (c === ',') { row.push(f); f = ''; }\n    else if (c === '\\n') { row.push(f); rows.push(row); row = []; f = ''; }\n    else if (c !== '\\r') f += c;\n  }\n  if (f !== '' || row.length) { row.push(f); rows.push(row); }\n  return rows;\n}\nconst tryJSON = s => { try { return JSON.parse(s); } catch { return null; } };\nconst num = s => (s === '' || s == null || isNaN(Number(s))) ? null : Number(s);\n\nconst rows = parseCSV(String($json.data || ''));\nconst head = rows.shift() || [];\nconst items = rows.filter(r => r.length > 1).map(r => {\n  const o = Object.fromEntries(head.map((h, i) => [h, r[i] ?? '']));\n  const ca = tryJSON(o.complete_address) || {};\n  return {\n    placeId: o.place_id,\n    title: o.title,\n    categoryName: o.category || null,\n    categories: o.category ? [o.category] : [],\n    address: o.address || null,\n    state: ca.state || ca.borough || null,\n    city: ca.city || null,\n    location: { lat: num(o.latitude), lng: num(o.longitude) },\n    phone: o.phone || null,\n    totalScore: num(o.review_rating),\n    reviewsCount: num(o.review_count) || 0,\n    website: o.website || null,\n    url: o.link || null,\n    emails: (o.emails || '').split(',').map(e => e.trim()).filter(Boolean),\n    permanentlyClosed: /permanently|vĩnh viễn/i.test(o.status || ''),\n    cid: o.cid || null\n  };\n});\n\nreturn { json: { job_id: $('Job đang chạy').item.json.job_id, count: items.length, items: JSON.stringify(items) } };"
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000008",
+      "name": "Lưu lead vào DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1440, 0],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ingest_places($1::bigint, $2::jsonb) AS result;",
+        "options": {
+          "queryReplacement": "={{ [ $json.job_id, $json.items ] }}"
+        }
+      },
+      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000009",
+      "name": "Xoá job bên gosom",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 0],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "=http://gmaps:8080/api/v1/jobs/{{ $('Job đang chạy').item.json.external_id }}",
+        "options": { "timeout": 15000 }
+      }
+    },
+    {
+      "id": "c1b2c3d4-0003-4000-8000-000000000010",
+      "name": "Đánh dấu job lỗi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1440, 240],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT fail_crawl_job($1::bigint, $2::text);",
+        "options": {
+          "queryReplacement": "={{ [ $('Job đang chạy').item.json.job_id, JSON.stringify($json.error ?? $json).slice(0, 2000) ] }}"
+        }
+      },
+      "credentials": { "postgres": { "id": "LhLeadsPostgres1", "name": "Leads Postgres" } }
+    }
+  ],
+  "connections": {
+    "Chạy thủ công": { "main": [ [ { "node": "Job đang chạy", "type": "main", "index": 0 } ] ] },
+    "5 phút/lần (23h–5h)": { "main": [ [ { "node": "Job đang chạy", "type": "main", "index": 0 } ] ] },
+    "Job đang chạy": { "main": [ [ { "node": "Hỏi trạng thái", "type": "main", "index": 0 } ] ] },
+    "Hỏi trạng thái": { "main": [ [ { "node": "Theo trạng thái", "type": "main", "index": 0 } ] ] },
+    "Theo trạng thái": {
+      "main": [
+        [ { "node": "Tải CSV", "type": "main", "index": 0 } ],
+        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Tải CSV": {
+      "main": [
+        [ { "node": "CSV → JSON", "type": "main", "index": 0 } ],
+        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+      ]
+    },
+    "CSV → JSON": { "main": [ [ { "node": "Lưu lead vào DB", "type": "main", "index": 0 } ] ] },
+    "Lưu lead vào DB": {
+      "main": [
+        [ { "node": "Xoá job bên gosom", "type": "main", "index": 0 } ],
+        [ { "node": "Đánh dấu job lỗi", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}

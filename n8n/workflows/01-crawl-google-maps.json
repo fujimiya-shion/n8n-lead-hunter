@@ -1,0 +1,189 @@
+{
+  "id": "LhCrawlMaps00001",
+  "name": "01 · Maps: gửi job crawl (gosom)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Chạy thủ công",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Mỗi tối 23:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 23 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Lên job crawl",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM plan_crawl_jobs('gosom_maps');",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "Gửi job sang gosom",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "http://gmaps:8080/api/v1/jobs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: 'lh-' + $json.job_id, keywords: [$json.keyword + ' ' + $json.location_query], lang: 'vi', zoom: 15, depth: $json.depth, email: $json.email, max_time: 3600 }) }}",
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Lưu id job gosom",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        740,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE crawl_jobs SET external_id = $2 WHERE id = $1::bigint RETURNING id, external_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lên job crawl').item.json.job_id, $json.id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "Đánh dấu job lỗi",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        740,
+        220
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT fail_crawl_job($1::bigint, $2::text);",
+        "options": {
+          "queryReplacement": "={{ [ $('Lên job crawl').item.json.job_id, JSON.stringify($json.error ?? $json).slice(0, 2000) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "LhLeadsPostgres1",
+          "name": "Leads Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chạy thủ công": {
+      "main": [
+        [
+          {
+            "node": "Lên job crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mỗi tối 23:00": {
+      "main": [
+        [
+          {
+            "node": "Lên job crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lên job crawl": {
+      "main": [
+        [
+          {
+            "node": "Gửi job sang gosom",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gửi job sang gosom": {
+      "main": [
+        [
+          {
+            "node": "Lưu id job gosom",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Đánh dấu job lỗi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
