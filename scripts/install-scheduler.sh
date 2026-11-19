@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Cài lịch tự chạy bằng systemd: đánh thức máy → chạy job → ngủ lại.
 # Giờ chạy lấy từ SCHEDULE_TIMES trong .env (vd "23:00" hoặc "09:00,13:00,17:00").
-# Chạy lại script này mỗi khi đổi SCHEDULE_TIMES.   Gỡ: scripts/install-scheduler.sh --uninstall
+# Chạy lại script này mỗi khi đổi SCHEDULE_TIMES hoặc sửa scripts/run-pipeline.sh, scripts/after-run.sh.   Gỡ: scripts/install-scheduler.sh --uninstall
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 UNIT=lead-hunter
+# SELinux (Fedora) không cho systemd chạy file nằm trong /home → copy script ra đây
+LIBEXEC=/usr/local/libexec/lead-hunter
 
 if [ "${1:-}" = "--uninstall" ]; then
   sudo systemctl disable --now "$UNIT.timer" 2>/dev/null || true
   sudo rm -f "/etc/systemd/system/$UNIT.service" "/etc/systemd/system/$UNIT.timer"
+  sudo rm -rf "$LIBEXEC"
   sudo systemctl daemon-reload
   echo "Đã gỡ lịch $UNIT"; exit 0
 fi
@@ -16,6 +19,9 @@ fi
 set -a; . "$DIR/.env"; set +a
 TIMES="${SCHEDULE_TIMES:-23:00}"
 chmod +x "$DIR/scripts/run-pipeline.sh" "$DIR/scripts/after-run.sh"
+sudo install -d -m 755 "$LIBEXEC"
+sudo install -m 755 "$DIR/scripts/run-pipeline.sh" "$DIR/scripts/after-run.sh" "$LIBEXEC/"
+command -v restorecon >/dev/null && sudo restorecon -R "$LIBEXEC"
 
 ONCAL=""
 IFS=',' read -ra ARR <<< "$TIMES"
@@ -34,10 +40,11 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-# Chặn sleep, idle và "gập nắp là sleep" trong lúc job chạy
-ExecStart=/usr/bin/systemd-inhibit --what=sleep:idle:handle-lid-switch --who="Lead Hunter" --why="Đang lấy lead" --mode=block $DIR/scripts/run-pipeline.sh
+Environment=LEAD_HUNTER_DIR=$DIR
+# Script tự xin chặn sleep / idle / "gập nắp là sleep" trong lúc job chạy (chờ resume xong mới xin)
+ExecStart=$LIBEXEC/run-pipeline.sh
 # Chạy xong: nếu máy được timer đánh thức và không ai dùng → ngủ lại
-ExecStopPost=$DIR/scripts/after-run.sh
+ExecStopPost=$LIBEXEC/after-run.sh
 TimeoutStartSec=4h
 EOF
 

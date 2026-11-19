@@ -6,8 +6,32 @@
 #   DRY_RUN=1 scripts/run-pipeline.sh  → chỉ đồng bộ quota + in kế hoạch, không gửi job, không tốn credit
 set -uo pipefail
 
-DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# systemd chạy bản copy ở /usr/local/libexec/lead-hunter (SELinux không cho chạy file trong /home),
+# nên thư mục project được truyền qua LEAD_HUNTER_DIR
+DIR="${LEAD_HUNTER_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$DIR"
+
+# Giữ máy thức trong lúc chạy. Ngay sau khi được đánh thức, logind có thể vẫn đang xử lý
+# lượt sleep/resume và từ chối inhibit → chờ tới khi xong (tối đa 60s) rồi mới xin.
+if [ -z "${LH_INHIBITED:-}" ] && command -v systemd-inhibit >/dev/null; then
+  rm -f /run/lead-hunter/started 2>/dev/null
+  for i in $(seq 1 30); do
+    busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager \
+      PreparingForSleep 2>/dev/null | grep -q false && break
+    sleep 2
+  done
+  for i in 1 2 3 4 5; do
+    LH_INHIBITED=1 systemd-inhibit --what=sleep:idle:handle-lid-switch --who="Lead Hunter" \
+      --why="Đang lấy lead" --mode=block env LH_INHIBITED=1 "$0" "$@"
+    rc=$?
+    # rc=1 ngay lập tức thường là inhibit bị từ chối → thử lại; còn lại là kết quả của chính script
+    [ "$rc" -ne 1 ] && exit "$rc"
+    [ -f "/run/lead-hunter/started" ] && exit "$rc"
+    echo "[$(date '+%F %T')] Chưa xin được quyền giữ máy thức, thử lại sau 5s ($i/5)"; sleep 5
+  done
+  echo "[$(date '+%F %T')] ⚠ Không xin được quyền giữ máy thức → vẫn chạy (máy có thể ngủ giữa chừng)"
+fi
+mkdir -p /run/lead-hunter 2>/dev/null && touch /run/lead-hunter/started 2>/dev/null
 set -a; . ./.env; set +a
 
 STATE_DIR=/run/lead-hunter
