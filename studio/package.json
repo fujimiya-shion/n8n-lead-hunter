@@ -1,0 +1,16 @@
+{
+  "name": "lead-hunter-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sinh demo web + tin nhắn chào hàng bằng LLM, chụp ảnh bằng Playwright, trang duyệt. Không gửi tin tự động.",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "fastify": "5.2.1",
+    "lucide-static": "0.469.0",
+    "pg": "8.13.1",
+    "playwright": "1.49.1"
+  }
+}

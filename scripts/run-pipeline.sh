@@ -106,4 +106,14 @@ done
 wf LhAuditWebsite01
 wf LhEnrichFbPage01
 
+# Tạo demo web + tin nhắn chào hàng (studio). Chỉ chuẩn bị nội dung để bạn duyệt và TỰ gửi.
+if [ -n "${LLM_API_KEY:-}" ] && [ -n "$(docker compose ps -q --status running studio 2>/dev/null)" ]; then
+  log "▶ Tạo demo + tin nhắn (studio)"
+  R=$(curl -s --max-time 7200 -X POST "http://127.0.0.1:${FORWARD_STUDIO_PORT:-8082}/api/generate-batch?wait=1" \
+        -H 'Content-Type: application/json' -d '{}')
+  log "  $R"
+else
+  log "Bỏ qua bước tạo demo (chưa có LLM_API_KEY hoặc studio đang tắt)"
+fi
+
 log "Xong: $(q "SELECT 'lead mới ' || count(*) || ', cần gọi ' || count(*) FILTER (WHERE status = 'to_contact') FROM businesses WHERE first_seen_at >= '$START_TS'"); tổng cần gọi: $(q "SELECT count(*) FROM businesses WHERE status = 'to_contact'")"

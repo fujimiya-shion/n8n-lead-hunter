@@ -97,7 +97,33 @@ services:
       JAVA_TIMEZONE: ${TZ}
       JAVA_OPTS: "-Xmx1g"
 
+  studio:
+    # Sinh demo web + tin nhắn chào hàng (LLM), chụp ảnh (Playwright), trang duyệt.
+    # KHÔNG gửi tin: bạn tự copy và tự gửi.
+    build: ./studio
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FORWARD_STUDIO_PORT:-8082}:8082"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_JUDGE_MODEL: ${LLM_JUDGE_MODEL:-}
+      LLM_THINKING: ${LLM_THINKING:-disabled}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
+      OPENVERSE_ENABLED: ${OPENVERSE_ENABLED:-true}
+      TZ: ${TZ}
+    volumes:
+      - studio_data:/data
+
 volumes:
+  studio_data:
   gmaps_data:
   pg_data:
   n8n_data:

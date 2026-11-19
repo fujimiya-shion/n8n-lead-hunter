@@ -1,0 +1,699 @@
+{
+  "lead": {
+    "name": "Nha Khoa An Tâm",
+    "industry": "nha khoa",
+    "phone": "0909 123 456",
+    "address": "123 Nguyễn Thị Thập, Quận 7, TP.HCM"
+  },
+  "plan": {
+    "message": "(mẫu)",
+    "brand": {
+      "logo_text": "An Tâm Dental",
+      "colors": {
+        "primary": "#1f6f78",
+        "accent": "#e9a23b",
+        "ink": "#16232a",
+        "surface": "#fbfaf7"
+      },
+      "font_heading": "Lora",
+      "font_body": "Be Vietnam Pro",
+      "illustration": "tooth"
+    },
+    "pages": [
+      {
+        "slug": "trang-chu",
+        "title": "Trang chủ",
+        "purpose": "Giới thiệu, tạo niềm tin",
+        "style": "minimal-business",
+        "sections": [
+          {
+            "type": "navbar",
+            "variant": "with-topbar"
+          },
+          {
+            "type": "hero",
+            "variant": "split-image"
+          },
+          {
+            "type": "trust_bar",
+            "variant": "icons-row"
+          },
+          {
+            "type": "services",
+            "variant": "grid-cards"
+          },
+          {
+            "type": "about",
+            "variant": "image-right"
+          },
+          {
+            "type": "stats",
+            "variant": "row"
+          },
+          {
+            "type": "testimonials",
+            "variant": "cards"
+          },
+          {
+            "type": "cta",
+            "variant": "banner"
+          },
+          {
+            "type": "footer",
+            "variant": "columns"
+          }
+        ]
+      },
+      {
+        "slug": "dat-lich",
+        "title": "Đặt lịch hẹn",
+        "purpose": "Khách đặt lịch khám",
+        "style": "clinical-clean",
+        "sections": [
+          {
+            "type": "navbar",
+            "variant": "simple"
+          },
+          {
+            "type": "hero",
+            "variant": "minimal-text"
+          },
+          {
+            "type": "booking_form",
+            "variant": "split"
+          },
+          {
+            "type": "process",
+            "variant": "steps-horizontal"
+          },
+          {
+            "type": "schedule",
+            "variant": "table"
+          },
+          {
+            "type": "contact",
+            "variant": "split-map"
+          },
+          {
+            "type": "faq",
+            "variant": "accordion"
+          },
+          {
+            "type": "footer",
+            "variant": "simple"
+          }
+        ]
+      },
+      {
+        "slug": "bang-gia",
+        "title": "Bảng giá & đội ngũ",
+        "purpose": "Minh bạch chi phí, giới thiệu bác sĩ",
+        "style": "editorial",
+        "sections": [
+          {
+            "type": "navbar",
+            "variant": "centered"
+          },
+          {
+            "type": "hero",
+            "variant": "centered"
+          },
+          {
+            "type": "pricing",
+            "variant": "cards"
+          },
+          {
+            "type": "price_list",
+            "variant": "grouped"
+          },
+          {
+            "type": "team",
+            "variant": "cards"
+          },
+          {
+            "type": "feature_list",
+            "variant": "alternating"
+          },
+          {
+            "type": "gallery",
+            "variant": "grid"
+          },
+          {
+            "type": "cta",
+            "variant": "split"
+          },
+          {
+            "type": "footer",
+            "variant": "simple"
+          }
+        ]
+      }
+    ]
+  },
+  "pages": [
+    {
+      "sections": [
+        {
+          "type": "navbar",
+          "links": [
+            "Dịch vụ",
+            "Bảng giá",
+            "Bác sĩ",
+            "Đặt lịch"
+          ],
+          "cta": {
+            "label": "Đặt lịch khám"
+          }
+        },
+        {
+          "type": "hero",
+          "eyebrow": "Nha khoa gia đình tại Quận 7",
+          "heading": "Khám răng nhẹ nhàng, giải thích rõ ràng từng bước",
+          "subheading": "Bác sĩ tư vấn kỹ trước khi điều trị, báo giá minh bạch, không phát sinh.",
+          "cta": {
+            "label": "Đặt lịch khám",
+            "secondary_label": "Xem bảng giá"
+          },
+          "image": {
+            "query": "dentist examining patient",
+            "alt": "Bác sĩ khám răng"
+          },
+          "items": [
+            {
+              "title": "Không đau, không vội",
+              "icon": "smile"
+            },
+            {
+              "title": "Báo giá trước khi làm",
+              "icon": "receipt"
+            }
+          ]
+        },
+        {
+          "type": "trust_bar",
+          "items": [
+            {
+              "title": "Bác sĩ 12 năm kinh nghiệm",
+              "icon": "stethoscope"
+            },
+            {
+              "title": "Dụng cụ tiệt trùng từng ca",
+              "icon": "shield-check"
+            },
+            {
+              "title": "Bảo hành bằng văn bản",
+              "icon": "file-check"
+            },
+            {
+              "title": "Mở cửa đến 20:00",
+              "icon": "clock"
+            }
+          ]
+        },
+        {
+          "type": "services",
+          "eyebrow": "Dịch vụ",
+          "heading": "Những gì chúng tôi làm tốt",
+          "subheading": "Tập trung vào các điều trị phổ biến, làm kỹ từng ca.",
+          "items": [
+            {
+              "title": "Trồng răng Implant",
+              "text": "Phục hồi răng mất, ăn nhai chắc như răng thật.",
+              "icon": "anchor",
+              "price": "Từ 12 triệu"
+            },
+            {
+              "title": "Niềng răng",
+              "text": "Mắc cài hoặc khay trong, theo dõi sát từng tháng.",
+              "icon": "align-center",
+              "price": "Từ 25 triệu"
+            },
+            {
+              "title": "Bọc răng sứ",
+              "text": "Màu tự nhiên, khít sát, không ê buốt.",
+              "icon": "sparkles",
+              "price": "Từ 2,5 triệu"
+            },
+            {
+              "title": "Điều trị tuỷ",
+              "text": "Giảm đau nhanh, giữ lại răng thật.",
+              "icon": "heart-pulse"
+            },
+            {
+              "title": "Cạo vôi, tẩy trắng",
+              "text": "Làm sạch định kỳ, trắng sáng an toàn.",
+              "icon": "droplet",
+              "price": "Từ 300.000đ"
+            },
+            {
+              "title": "Nha khoa trẻ em",
+              "text": "Không gian thân thiện, bé không sợ.",
+              "icon": "baby"
+            }
+          ]
+        },
+        {
+          "type": "about",
+          "eyebrow": "Về phòng khám",
+          "heading": "Một phòng khám nhỏ, làm việc kỹ",
+          "body": "Chúng tôi chỉ nhận số lượng khách vừa đủ mỗi ngày để bác sĩ có thời gian khám và giải thích cho từng người.",
+          "image": {
+            "query": "modern dental clinic interior",
+            "alt": "Phòng khám"
+          },
+          "items": [
+            {
+              "title": "3 ghế nha",
+              "text": "Không chờ lâu"
+            },
+            {
+              "title": "Máy chụp X-quang",
+              "text": "Kỹ thuật số, ít tia"
+            }
+          ]
+        },
+        {
+          "type": "stats",
+          "items": [
+            {
+              "value": "12",
+              "label": "năm kinh nghiệm"
+            },
+            {
+              "value": "4.9",
+              "label": "điểm Google"
+            },
+            {
+              "value": "500+",
+              "label": "đánh giá"
+            },
+            {
+              "value": "0đ",
+              "label": "phí khám tư vấn"
+            }
+          ]
+        },
+        {
+          "type": "testimonials",
+          "heading": "Khách hàng nói gì",
+          "items": [
+            {
+              "name": "Chị Lan H.",
+              "role": "Quận 7",
+              "quote": "Bác sĩ giải thích rất kỹ, làm xong không đau như mình nghĩ.",
+              "rating": 5
+            },
+            {
+              "name": "Anh Minh T.",
+              "role": "Nhà Bè",
+              "quote": "Báo giá đúng như ban đầu, không phát sinh gì thêm.",
+              "rating": 5
+            },
+            {
+              "name": "Chị Thu N.",
+              "role": "Quận 4",
+              "quote": "Đưa bé đi khám, bé không khóc. Sẽ quay lại.",
+              "rating": 5
+            }
+          ]
+        },
+        {
+          "type": "cta",
+          "heading": "Đặt lịch khám, tư vấn miễn phí",
+          "subheading": "Gọi hoặc nhắn Zalo, phòng khám phản hồi trong 15 phút.",
+          "cta": {
+            "label": "Gọi 0909 123 456"
+          }
+        },
+        {
+          "type": "footer",
+          "body": "Phòng khám nha khoa gia đình tại Quận 7.",
+          "links": [
+            "Dịch vụ",
+            "Bảng giá",
+            "Đặt lịch"
+          ]
+        }
+      ]
+    },
+    {
+      "sections": [
+        {
+          "type": "navbar",
+          "links": [
+            "Trang chủ",
+            "Bảng giá",
+            "Đặt lịch"
+          ],
+          "cta": {
+            "label": "Gọi ngay"
+          }
+        },
+        {
+          "type": "hero",
+          "eyebrow": "Đặt lịch hẹn",
+          "heading": "Chọn giờ phù hợp, không phải chờ",
+          "subheading": "Điền thông tin, phòng khám gọi xác nhận trong 15 phút.",
+          "cta": {
+            "label": "Gọi đặt lịch"
+          }
+        },
+        {
+          "type": "booking_form",
+          "heading": "Thông tin đặt lịch",
+          "subheading": "Lịch khám được xác nhận qua điện thoại.",
+          "illustration": "tooth",
+          "fields": [
+            {
+              "label": "Họ và tên",
+              "type": "text",
+              "placeholder": "Nguyễn Văn A"
+            },
+            {
+              "label": "Số điện thoại",
+              "type": "tel",
+              "placeholder": "09xx xxx xxx"
+            },
+            {
+              "label": "Dịch vụ",
+              "type": "select",
+              "options": [
+                "Khám tổng quát",
+                "Niềng răng",
+                "Implant",
+                "Bọc sứ"
+              ]
+            },
+            {
+              "label": "Ngày khám",
+              "type": "date"
+            },
+            {
+              "label": "Khung giờ",
+              "type": "time",
+              "options": [
+                "08:00",
+                "09:30",
+                "14:00",
+                "16:30",
+                "18:00"
+              ]
+            },
+            {
+              "label": "Ghi chú",
+              "type": "textarea",
+              "placeholder": "Tình trạng răng, câu hỏi cho bác sĩ..."
+            }
+          ],
+          "cta": {
+            "label": "Gửi yêu cầu đặt lịch"
+          },
+          "items": [
+            {
+              "title": "Xác nhận trong 15 phút",
+              "text": "Qua điện thoại hoặc Zalo",
+              "icon": "message-circle"
+            },
+            {
+              "title": "Huỷ, đổi lịch miễn phí",
+              "text": "Báo trước 2 giờ",
+              "icon": "calendar-x"
+            }
+          ],
+          "note": "Thông tin chỉ dùng để liên hệ đặt lịch."
+        },
+        {
+          "type": "process",
+          "heading": "Một buổi khám diễn ra thế nào",
+          "items": [
+            {
+              "title": "Đón tiếp",
+              "text": "Ghi nhận thông tin, tình trạng răng."
+            },
+            {
+              "title": "Khám & chụp phim",
+              "text": "Bác sĩ kiểm tra, chụp X-quang nếu cần."
+            },
+            {
+              "title": "Tư vấn & báo giá",
+              "text": "Giải thích phương án, chi phí rõ ràng."
+            },
+            {
+              "title": "Điều trị",
+              "text": "Chỉ làm khi bạn đồng ý."
+            }
+          ]
+        },
+        {
+          "type": "schedule",
+          "heading": "Giờ làm việc",
+          "items": [
+            {
+              "title": "Khám & điều trị",
+              "day": "Thứ 2 – Thứ 6",
+              "time": "08:00 – 20:00"
+            },
+            {
+              "title": "Khám & điều trị",
+              "day": "Thứ 7",
+              "time": "08:00 – 17:00"
+            },
+            {
+              "title": "Chỉ nhận lịch hẹn trước",
+              "day": "Chủ nhật",
+              "time": "08:00 – 12:00",
+              "badge": "Hẹn trước"
+            }
+          ]
+        },
+        {
+          "type": "contact",
+          "heading": "Đường đến phòng khám",
+          "items": [
+            {
+              "title": "Giờ mở cửa",
+              "text": "8:00 – 20:00 mỗi ngày",
+              "icon": "clock"
+            },
+            {
+              "title": "Gửi xe",
+              "text": "Có chỗ để xe máy miễn phí",
+              "icon": "bike"
+            }
+          ]
+        },
+        {
+          "type": "faq",
+          "heading": "Câu hỏi khi đặt lịch",
+          "items": [
+            {
+              "q": "Có cần đặt cọc không?",
+              "a": "Không. Bạn chỉ thanh toán khi điều trị."
+            },
+            {
+              "q": "Đến trễ thì sao?",
+              "a": "Phòng khám giữ lịch 15 phút, quá thì sắp xếp giờ khác."
+            },
+            {
+              "q": "Khám lần đầu bao lâu?",
+              "a": "Khoảng 30–45 phút, gồm khám và tư vấn."
+            }
+          ]
+        },
+        {
+          "type": "footer",
+          "body": "Đặt lịch nhanh, khám đúng giờ."
+        }
+      ]
+    },
+    {
+      "sections": [
+        {
+          "type": "navbar",
+          "links": [
+            "Trang chủ",
+            "Bảng giá",
+            "Bác sĩ"
+          ]
+        },
+        {
+          "type": "hero",
+          "eyebrow": "Bảng giá 2026",
+          "heading": "Chi phí rõ ràng trước khi điều trị",
+          "subheading": "Giá tham khảo. Bác sĩ báo giá chính xác sau khi khám.",
+          "image": {
+            "query": "dental clinic reception",
+            "alt": "Quầy tiếp đón"
+          },
+          "cta": {
+            "label": "Nhận báo giá"
+          }
+        },
+        {
+          "type": "pricing",
+          "heading": "Gói phổ biến",
+          "items": [
+            {
+              "title": "Khám & cạo vôi",
+              "price": "300.000đ",
+              "unit": "lần",
+              "features": [
+                "Khám tổng quát",
+                "Cạo vôi, đánh bóng",
+                "Tư vấn chăm sóc"
+              ]
+            },
+            {
+              "title": "Bọc sứ Zirconia",
+              "price": "4,5 triệu",
+              "unit": "răng",
+              "features": [
+                "Sứ toàn phần",
+                "Bảo hành 10 năm",
+                "Xong trong 3 ngày"
+              ],
+              "featured": true,
+              "badge": "Được chọn nhiều"
+            },
+            {
+              "title": "Implant Hàn Quốc",
+              "price": "12 triệu",
+              "unit": "trụ",
+              "features": [
+                "Trụ chính hãng",
+                "Bảo hành 15 năm",
+                "Tái khám miễn phí"
+              ]
+            }
+          ],
+          "note": "Giá đã gồm thuế."
+        },
+        {
+          "type": "price_list",
+          "heading": "Bảng giá chi tiết",
+          "items": [
+            {
+              "title": "Trám răng thẩm mỹ",
+              "price": "300.000đ",
+              "group": "Điều trị"
+            },
+            {
+              "title": "Điều trị tuỷ răng hàm",
+              "price": "1,5 triệu",
+              "group": "Điều trị"
+            },
+            {
+              "title": "Nhổ răng khôn",
+              "price": "1,2 triệu",
+              "group": "Điều trị"
+            },
+            {
+              "title": "Tẩy trắng tại phòng",
+              "price": "2,5 triệu",
+              "group": "Thẩm mỹ"
+            },
+            {
+              "title": "Mặt dán sứ Veneer",
+              "price": "6 triệu",
+              "group": "Thẩm mỹ"
+            },
+            {
+              "title": "Niềng khay trong",
+              "price": "Từ 45 triệu",
+              "group": "Thẩm mỹ"
+            }
+          ]
+        },
+        {
+          "type": "team",
+          "heading": "Bác sĩ của chúng tôi",
+          "items": [
+            {
+              "name": "BS. Trần Minh Khoa",
+              "role": "Phục hình & Implant",
+              "text": "12 năm kinh nghiệm."
+            },
+            {
+              "name": "BS. Lê Thu Hà",
+              "role": "Chỉnh nha",
+              "text": "Chứng chỉ chỉnh nha khay trong."
+            },
+            {
+              "name": "BS. Phạm Quang",
+              "role": "Nha khoa tổng quát",
+              "text": "Thân thiện với trẻ em."
+            }
+          ]
+        },
+        {
+          "type": "feature_list",
+          "heading": "Vì sao giá hợp lý",
+          "items": [
+            {
+              "title": "Không qua trung gian",
+              "text": "Vật liệu nhập trực tiếp, giá tốt hơn.",
+              "icon": "package",
+              "image": {
+                "query": "dental tools sterilized",
+                "alt": "Dụng cụ"
+              }
+            },
+            {
+              "title": "Làm đúng chỉ định",
+              "text": "Không tư vấn làm thêm khi không cần.",
+              "icon": "check-circle",
+              "image": {
+                "query": "dentist consultation",
+                "alt": "Tư vấn"
+              }
+            }
+          ]
+        },
+        {
+          "type": "gallery",
+          "heading": "Không gian phòng khám",
+          "items": [
+            {
+              "title": "Khu chờ",
+              "image": {
+                "query": "clinic waiting room",
+                "alt": ""
+              }
+            },
+            {
+              "title": "Phòng điều trị",
+              "image": {
+                "query": "dental chair room",
+                "alt": ""
+              }
+            },
+            {
+              "title": "Phòng tiệt trùng",
+              "image": {
+                "query": "medical sterilization room",
+                "alt": ""
+              }
+            }
+          ]
+        },
+        {
+          "type": "cta",
+          "heading": "Muốn biết chính xác chi phí?",
+          "subheading": "Khám và báo giá miễn phí.",
+          "cta": {
+            "label": "Đặt lịch khám",
+            "secondary_label": "Nhắn Zalo"
+          },
+          "image": {
+            "query": "smiling patient dentist",
+            "alt": ""
+          }
+        },
+        {
+          "type": "footer",
+          "body": "Giá minh bạch, điều trị tận tâm."
+        }
+      ]
+    }
+  ]
+}

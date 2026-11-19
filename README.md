@@ -2,7 +2,7 @@
 
 Tự động tìm lead làm web từ Google Maps (gosom/google-maps-scraper, miễn phí, chạy local), audit website, chấm điểm.
 Apify để dành cho Facebook.
-Dừng ở bước có danh sách lead. Liên hệ khách là việc của bạn.
+Mỗi lead nóng có sẵn demo web + tin nhắn chào hàng do LLM tạo để bạn duyệt. **Việc gửi tin do bạn tự làm**, hệ thống không gửi gì.
 
 | Dịch vụ | URL mặc định | Biến cổng trong `.env` |
 |---|---|---|
@@ -10,6 +10,7 @@ Dừng ở bước có danh sách lead. Liên hệ khách là việc của bạn
 | gosom scraper | http://localhost:8081 | `FORWARD_GMAPS_PORT` |
 | NocoDB | http://localhost:8090 | `FORWARD_NOCODB_PORT` |
 | Metabase | http://localhost:3000 | `FORWARD_METABASE_PORT` |
+| **Lead Studio** (demo + tin nhắn) | http://localhost:8082 | `FORWARD_STUDIO_PORT` |
 | PostgreSQL | `localhost:5433` · DB `leads` | `FORWARD_POSTGRES_PORT` |
 
 Mọi cổng chỉ mở trên `127.0.0.1`. Đụng cổng với project khác thì đổi biến `FORWARD_*_PORT` trong `.env`
@@ -28,7 +29,7 @@ SCHEDULE_TIMES (mặc định 10:00)  lead-hunter.timer đánh thức máy (Wake
   scripts/run-pipeline.sh  (chặn sleep và "gập nắp là sleep" trong lúc chạy)
     07 đồng bộ quota Apify → 01 gửi job Maps (gosom) → 05 gửi job Facebook (Apify)
     chờ 03/06 thu hết kết quả (n8n, 5 phút/lần, chạy cả ngày)
-    02 audit website → 04 enrich fanpage
+    02 audit website → 04 enrich fanpage → studio tạo demo + tin nhắn (nếu có LLM_API_KEY)
   scripts/after-run.sh
     nếu máy do timer đánh thức VÀ màn hình còn khoá hoặc nắp đang gập → cho máy ngủ lại
     nếu bạn đang dùng máy → giữ nguyên
@@ -78,6 +79,35 @@ Dữ liệu lấy từ các view `a_*` trong `db/06-analytics.sql` (`a_leads` l�
 | Bảng phụ | `crawl_jobs` → 🛠 Lịch sử job · `industries` → 🎯 Theo priority |
 
 Hẹn gọi lại: điền cột `next_call_at` → lead hiện trên 📅 Lịch gọi lại và bảng "Lịch gọi lại sắp tới" trên Metabase.
+
+## Demo web & tin nhắn chào hàng (Lead Studio)
+
+Service `studio` (thư mục `studio/`, Node + Playwright). Mỗi lượt chạy tạo cho `settings.outreach_per_run` (mặc định 10)
+lead `to_contact` có SĐT và điểm ≥ `outreach_min_lead_score`:
+
+1. **LLM viết nội dung** (JSON): tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật của shop) và chữ cho trang demo.
+   LLM **không viết HTML**: trang được dựng từ **bộ template chuẩn** theo 7 nhóm ngành (`studio/src/templates/`):
+   - `families.js`: cách nhận diện ngành, bảng màu, phong cách (sáng/tối), icon được phép, và **"skill" viết nội dung** cho từng nhóm.
+   - `render.js`: bố cục 12 phần (nav, hero, số liệu, dịch vụ, lý do chọn, quy trình, dự án, bảng giá, đánh giá, hỏi đáp, liên hệ, footer).
+     Mọi chữ đều được escape và giới hạn độ dài. Tên, SĐT, địa chỉ lấy từ DB.
+   - Xem trước toàn bộ template (nội dung mẫu, không tốn token): http://localhost:8082/preview
+2. **Playwright chụp** bản desktop (1440×900) và mobile (390px, tối đa 2.600px đầu trang, gửi chat vừa đẹp):
+   `http://localhost:8082/demo/<id>/`, `…/desktop.png`, `…/mobile.png`.
+3. **LLM chấm** `human` (tự nhiên như người viết) và `fit` (demo khớp ngành và tên shop), cộng thêm luật trừ điểm cụm sáo rỗng.
+   `confidence = 0.4 × điểm lead + 0.3 × human + 0.3 × fit`. Từ `outreach_ready_threshold` (80) trở lên được gắn nhãn **Sẵn sàng**.
+   Confidence chỉ để **xếp hạng**, không dùng để tự gửi.
+4. **Trang duyệt** http://localhost:8082: sửa tin nhắn (tự lưu), duyệt hoặc bỏ qua hàng loạt,
+   copy SĐT, tin nhắn, ảnh (dán thẳng vào Zalo). Tự gửi xong bấm **Đã gửi** → lead chuyển `contacted`.
+
+LLM: mọi provider tương thích OpenAI (DeepSeek, Gemini, OpenRouter...). Cấu hình `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`
+(và `LLM_JUDGE_MODEL` nếu muốn dùng model khác để chấm) trong `.env`, rồi chạy `docker compose up -d studio`.
+Ký tên và câu giới thiệu trong tin nhắn: `settings.outreach_sender_name`, `settings.outreach_sender_intro`.
+
+```bash
+docker compose up -d --build studio          # build lại sau khi sửa code trong studio/
+curl -X POST localhost:8082/api/generate-batch -H 'Content-Type: application/json' -d '{"limit":3}'   # tạo thử 3 lead
+docker compose logs -f studio
+```
 
 ## Cấu hình chạy (sửa trong NocoDB, không cần restart)
 
