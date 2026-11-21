@@ -54,6 +54,8 @@ export async function chat({ model = MODEL, messages, maxTokens = 4000, temperat
         finishReason: data.choices?.[0]?.finish_reason,
         tokensIn: data.usage?.prompt_tokens ?? null,
         tokensOut: data.usage?.completion_tokens ?? null,
+        // số token đầu vào trúng cache prompt của provider (OpenAI/MiMo: prompt_tokens_details.cached_tokens; DeepSeek: prompt_cache_hit_tokens)
+        tokensCached: data.usage?.prompt_tokens_details?.cached_tokens ?? data.usage?.prompt_cache_hit_tokens ?? 0,
       };
     } catch (e) {
       if (e.message?.startsWith('LLM HTTP 4')) throw e;

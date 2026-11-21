@@ -15,6 +15,7 @@ async function api(url, opt = {}) {
 }
 const num = (v) => (v == null ? null : Number(v));
 const fmt = (v) => (v == null ? '—' : Number(v).toLocaleString('vi-VN'));
+const cachePct = (r) => `${Math.round((100 * Number(r.tokens_cached || 0)) / Math.max(1, Number(r.tokens_in || 0)))}%`; // tỉ lệ token vào trúng cache prompt
 const ago = (t) => (t ? dayjs(t).format('DD/MM/YY HH:mm') : '—');
 const shotUrl = (r, f) => `/shots/${r.id}/${f}?v=${r.shots_v || ''}`;
 async function copyText(text) { await navigator.clipboard.writeText(text); }
@@ -154,7 +155,7 @@ function Shell() {
             ${status.llm_configured
               ? html`<${A.Tooltip} title="Model LLM đang dùng"><${A.Tag} icon=${html`<${I.RobotOutlined} />`} color="blue">${status.model}</${A.Tag}><//>`
               : html`<${A.Tag} color="red">Chưa cấu hình LLM</${A.Tag}>`}
-            <${A.Tooltip} title="Tổng token LLM đã dùng (vào / ra)"><${Text} type="secondary" style=${{ fontSize: 12 }}>${fmt(c.tokens_in)} / ${fmt(c.tokens_out)} token</${Text}><//>
+            <${A.Tooltip} title=${`Tổng token LLM đã dùng (vào / ra). Trong token vào có ${fmt(c.tokens_cached)} token trúng cache prompt (${cachePct(c)}), rẻ hơn token thường.`}><${Text} type="secondary" style=${{ fontSize: 12 }}>${fmt(c.tokens_in)} / ${fmt(c.tokens_out)} token${Number(c.tokens_cached) ? ` · cache ${cachePct(c)}` : ''}</${Text}><//>
             <${QueueButton} />
           <//>`}
         <//>
@@ -502,7 +503,7 @@ function DemoDrawer({ id, onClose }) {
               { label: 'Lý do', children: r.score_reasons || '—' },
               { label: 'Website', children: r.website_url ? html`<a href=${r.website_url} target="_blank">${r.website_url}</a>` : r.website_label || '—' },
               { label: 'Liên kết', children: html`<${A.Space}>${r.maps_url && html`<a href=${r.maps_url} target="_blank">Google Maps</a>`}${r.facebook_url && html`<a href=${r.facebook_url} target="_blank">Fanpage</a>`}<//>` },
-              { label: 'Token', children: `${fmt(r.tokens_in)} vào / ${fmt(r.tokens_out)} ra` },
+              { label: 'Token', children: `${fmt(r.tokens_in)} vào / ${fmt(r.tokens_out)} ra${Number(r.tokens_cached) ? ` · cache ${cachePct(r)}` : ''}` },
               { label: 'Prompt', children: html`<a href=${`#/demo/${r.id}`}>Xem các màn hình & prompt đã gửi</a>` },
             ]} />
           <//>
@@ -776,7 +777,7 @@ function DemoPage() {
           ${r.old_site_url && html`<${A.Tag} color="purple">Làm mới web cũ</${A.Tag}>`}
         <//>
         ${r.confidence != null && html`<${A.Statistic} title="Confident" value=${r.confidence} valueStyle=${{ color: scoreColor(r.confidence) }} />`}
-        <${A.Statistic} title="Token vào / ra" value=${`${fmt(r.tokens_in)} / ${fmt(r.tokens_out)}`} valueStyle=${{ fontSize: 18 }} />
+        <${A.Statistic} title=${`Token vào / ra${Number(r.tokens_cached) ? ` (cache ${cachePct(r)})` : ''}`} value=${`${fmt(r.tokens_in)} / ${fmt(r.tokens_out)}`} valueStyle=${{ fontSize: 18 }} />
         <${A.Button} type="primary" onClick=${() => openDemo(r.id)}>Duyệt & tin nhắn<//>
       <//>
       ${r.status === 'generating' && html`<${A.Alert} style=${{ marginTop: 12 }} type="info" showIcon icon=${html`<${I.LoadingOutlined} />`} message="Đang tạo demo — trang tự cập nhật khi xong." />`}
@@ -913,7 +914,7 @@ function EditorPage() {
       <${A.List} dataSource=${d.versions} locale=${{ emptyText: 'Chưa có phiên bản nào được lưu' }} renderItem=${(v) => html`<${A.List.Item} key=${v.id} style=${{ padding: '10px 16px' }}
         actions=${[html`<${A.Button} size="small" onClick=${() => loadVersion(v.id)}>Nạp<//>`]}>
         <${A.List.Item.Meta} avatar=${html`<${A.Tag} color=${{ llm: 'purple', edit: 'green', regen: 'blue' }[v.source]}>${SRC_VI[v.source] || v.source}</${A.Tag}>`}
-          title=${ago(v.created_at)} description=${`${fmt(v.chars)} ký tự${v.tokens_in ? ` · ${fmt(v.tokens_in)}/${fmt(v.tokens_out)} token` : ''}`} />
+          title=${ago(v.created_at)} description=${`${fmt(v.chars)} ký tự${v.tokens_in ? ` · ${fmt(v.tokens_in)}/${fmt(v.tokens_out)} token${Number(v.tokens_cached) ? ` · cache ${cachePct(v)}` : ''}` : ''}`} />
       <//>`} />
     </div>` },
   ];

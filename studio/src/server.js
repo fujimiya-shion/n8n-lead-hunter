@@ -112,7 +112,7 @@ app.get('/api/status', async () => {
        (SELECT count(*) FROM outreach o2 JOIN businesses b ON b.id = o2.business_id
          WHERE o2.status = 'sent' AND b.next_call_at < date_trunc('day', now()) + interval '1 day'
            AND b.status IN ('contacted', 'interested')) AS followups_due,
-       coalesce(sum(tokens_in), 0) AS tokens_in, coalesce(sum(tokens_out), 0) AS tokens_out
+       coalesce(sum(tokens_in), 0) AS tokens_in, coalesce(sum(tokens_out), 0) AS tokens_out, coalesce(sum(tokens_cached), 0) AS tokens_cached
      FROM outreach`, [threshold])).rows[0];
   const counts = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Number(v)]));
   return {
@@ -236,7 +236,7 @@ app.put('/api/settings/:key', async (req, reply) => {
 });
 
 const OUTREACH_SQL = `SELECT o.id, o.business_id, o.status, o.message, o.message_original, o.demo_title, o.confidence,
-            o.lead_score, o.human_score, o.fit_score, o.judge_issues, o.error, o.created_at, o.sent_at, o.tokens_in, o.tokens_out,
+            o.lead_score, o.human_score, o.fit_score, o.judge_issues, o.error, o.created_at, o.sent_at, o.tokens_in, o.tokens_out, o.tokens_cached,
             o.shots, left(md5(coalesce(o.shots::text, '')), 10) AS shots_v, o.site_plan->'old_site'->>'url' AS old_site_url,
             o.site_plan->'brand' AS brand,
             (SELECT jsonb_agg(jsonb_build_object('slug', p->>'slug', 'title', p->>'title', 'kind', p->>'kind')) FROM jsonb_array_elements(o.llm_pages) p) AS llm_list,
@@ -376,7 +376,7 @@ app.get('/api/outreach/:id/pages/:slug', async (req, reply) => {
   if (!x) return reply.code(404).send({ error: 'Không có màn hình này' });
   const { prompt, rebuilt } = await promptOf(x);
   const versions = (await pool.query(
-    `SELECT id, source, tokens_in, tokens_out, created_at, length(html) AS chars FROM page_versions
+    `SELECT id, source, tokens_in, tokens_out, tokens_cached, created_at, length(html) AS chars FROM page_versions
      WHERE outreach_id = $1 AND slug = $2 ORDER BY created_at DESC LIMIT 50`, [x.o.id, x.page.slug])).rows;
   return {
     id: x.o.id, slug: x.page.slug, title: x.page.title, kind: x.page.kind, status: x.o.status,

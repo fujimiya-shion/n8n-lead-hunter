@@ -19,6 +19,8 @@ const SKILL_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..',
 export const shotsDir = (outreachId) => path.join(DATA_DIR, 'shots', String(outreachId));
 export const tmpDir = () => path.join(DATA_DIR, 'tmp');
 
+// màn hình đầu gửi trước bao lâu rồi mới gửi các màn hình còn lại (đo trên MiMo: cache dùng được ~1–3 giây sau lời gọi đầu)
+const CACHE_WARM_MS = Number(process.env.LLM_CACHE_WARM_MS ?? 4000);
 const RETRY_NOTE = 'Lần trước câu trả lời bị hỏng (viết kế hoạch bằng chữ, dừng giữa chừng, thiếu header/footer, hoặc quá dài nên bị cắt). '
   + 'Viết lại: bắt đầu NGAY bằng thẻ HTML, không một chữ giải thích nào, gọn hơn (tối đa 7 khối data-section cho trang chủ, 1–3 khối cho section/modal).';
 
@@ -83,10 +85,13 @@ function humanPenalty(message) {
 }
 
 /** Chạy các hàm async với giới hạn số việc cùng lúc; trả về kết quả kiểu allSettled theo đúng thứ tự */
-async function limited(fns, n) {
+async function limited(fns, n, { warmMs = 0 } = {}) {
   const out = new Array(fns.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(n, fns.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(n, fns.length) }, async (_, w) => {
+    // warmMs: việc đầu chạy trước, các việc còn lại chờ một chút → provider kịp ghi cache phần đầu prompt dùng chung
+    // (gọi đồng loạt cùng lúc thì không lời gọi nào trúng cache của nhau)
+    if (w > 0 && warmMs) await new Promise((r) => setTimeout(r, warmMs));
     while (next < fns.length) {
       const i = next++;
       try { out[i] = { status: 'fulfilled', value: await fns[i]() }; } catch (e) { out[i] = { status: 'rejected', reason: e }; }
@@ -118,8 +123,8 @@ export async function generateForLead(pool, businessId) {
     `INSERT INTO outreach (business_id, status, model, template) VALUES ($1, 'generating', $2, 'llm-v2') RETURNING id`,
     [businessId, MODEL])).rows[0].id;
 
-  let tokensIn = 0, tokensOut = 0;
-  const track = (r) => { tokensIn += r.tokensIn || 0; tokensOut += r.tokensOut || 0; return r; };
+  let tokensIn = 0, tokensOut = 0, tokensCached = 0;
+  const track = (r) => { tokensIn += r.tokensIn || 0; tokensOut += r.tokensOut || 0; tokensCached += r.tokensCached || 0; return r; };
   const askJson = async (messages, maxTokens) => {
     const r = track(await chat({ messages, maxTokens, temperature: 0.8, json: true }));
     try { return parseJson(r.content); } catch { throw new Error(`LLM trả về JSON không hợp lệ (finish_reason=${r.finishReason})`); }
@@ -173,7 +178,7 @@ export async function generateForLead(pool, businessId) {
     // 3) HTML từng màn hình, gọi LLM song song (giới hạn `concurrency`)
     const htmlOpts = { hasShopPhoto: Boolean(photo), recent: recent.layout, oldSite };
     const promptOf = (sc) => htmlPrompt(lead, plan.brand, sc, screens, htmlOpts); // lưu vào DB, sửa được trên trang 8082
-    const first = await limited(screens.map((sc) => () => askHtml(withSkill(skill, promptOf(sc)))), concurrency);
+    const first = await limited(screens.map((sc) => () => askHtml(withSkill(skill, promptOf(sc)))), concurrency, { warmMs: CACHE_WARM_MS });
 
     // 4) Kiểm tra → dựng → chụp lần lượt; hỏng thì gọi lại 1 lần kèm lỗi cụ thể
     const shots = [], summaries = [], pages = [];
@@ -223,19 +228,19 @@ export async function generateForLead(pool, businessId) {
     await pool.query(
       `UPDATE outreach SET status = 'draft', message = $2, message_original = $2, demo_title = $3,
          lead_score = $4, human_score = $5, fit_score = $6, confidence = $7, judge_issues = $8,
-         tokens_in = $9, tokens_out = $10, site_plan = $11, llm_pages = $12, shots = $13, prompts = $14, error = NULL, updated_at = now()
+         tokens_in = $9, tokens_out = $10, site_plan = $11, llm_pages = $12, shots = $13, prompts = $14, tokens_cached = $15, error = NULL, updated_at = now()
        WHERE id = $1`,
       [id, plan.message, pages.map((p) => p.title).join(' · '), leadScore, human, fit, confidence, JSON.stringify(allIssues),
         tokensIn, tokensOut, JSON.stringify({ brand: plan.brand, screens, old_site: old ? { url: old.url, via: old.via } : null }),
-        JSON.stringify(pages), JSON.stringify(shots), JSON.stringify(prompts)]);
+        JSON.stringify(pages), JSON.stringify(shots), JSON.stringify(prompts), tokensCached]);
     for (const p of pages) {
       await pool.query(`INSERT INTO page_versions (outreach_id, slug, source, prompt, html) VALUES ($1, $2, 'llm', $3, $4)`,
         [id, p.slug, JSON.stringify(p.prompt), p.html]);
     }
     return id;
   } catch (e) {
-    await pool.query(`UPDATE outreach SET status = 'failed', error = $2, tokens_in = $3, tokens_out = $4, updated_at = now() WHERE id = $1`,
-      [id, String(e.message || e).slice(0, 1000), tokensIn, tokensOut]);
+    await pool.query(`UPDATE outreach SET status = 'failed', error = $2, tokens_in = $3, tokens_out = $4, tokens_cached = $5, updated_at = now() WHERE id = $1`,
+      [id, String(e.message || e).slice(0, 1000), tokensIn, tokensOut, tokensCached]);
     throw e;
   }
 }
@@ -263,7 +268,7 @@ export async function loadStoredPage(pool, id, slug) {
  * Thay HTML của 1 màn hình: kiểm tra → Playwright chụp lại → thay ảnh cũ đúng vị trí → lưu llm_pages + 1 dòng page_versions.
  * Lỗi kiểm tra HTML ném ra có e.status = 400.
  */
-export async function replacePageHtml(pool, x, raw, { source, prompt = null, tokensIn = null, tokensOut = null }) {
+export async function replacePageHtml(pool, x, raw, { source, prompt = null, tokensIn = null, tokensOut = null, tokensCached = null }) {
   let html;
   try { html = await buildStoredPage(pool, x.o, x.lead, x.page, raw); } catch (e) { e.status = 400; throw e; }
   const r = await shootHtml(html, { id: x.o.id, view: x.page, track: 'llm' }); // tên file có timestamp → không đè ảnh cũ
@@ -282,11 +287,12 @@ export async function replacePageHtml(pool, x, raw, { source, prompt = null, tok
     ? { ...p, html: raw, truncated: false, ...(prompt ? { prompt } : {}), [source === 'regen' ? 'regenerated_at' : 'edited_at']: now } : p));
   await pool.query(
     `UPDATE outreach SET llm_pages = $2, shots = $3, updated_at = now(),
-       tokens_in = coalesce(tokens_in, 0) + $4, tokens_out = coalesce(tokens_out, 0) + $5 WHERE id = $1`,
-    [x.o.id, JSON.stringify(pages), JSON.stringify(shots), tokensIn || 0, tokensOut || 0]);
+       tokens_in = coalesce(tokens_in, 0) + $4, tokens_out = coalesce(tokens_out, 0) + $5,
+       tokens_cached = coalesce(tokens_cached, 0) + $6 WHERE id = $1`,
+    [x.o.id, JSON.stringify(pages), JSON.stringify(shots), tokensIn || 0, tokensOut || 0, tokensCached || 0]);
   await pool.query(
-    `INSERT INTO page_versions (outreach_id, slug, source, prompt, html, tokens_in, tokens_out) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [x.o.id, x.page.slug, source, prompt ? JSON.stringify(prompt) : null, raw, tokensIn, tokensOut]);
+    `INSERT INTO page_versions (outreach_id, slug, source, prompt, html, tokens_in, tokens_out, tokens_cached) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [x.o.id, x.page.slug, source, prompt ? JSON.stringify(prompt) : null, raw, tokensIn, tokensOut, tokensCached]);
   const keep = new Set(r.shots.map((s) => s.file));
   for (const s of old) if (!keep.has(s.file)) await fs.rm(path.join(shotsDir(x.o.id), s.file), { force: true });
   return { shots: r.shots.length };
@@ -295,15 +301,15 @@ export async function replacePageHtml(pool, x, raw, { source, prompt = null, tok
 /** Gửi lại prompt (đã chỉnh) cho LLM → HTML mới → chụp lại. Skill luôn lấy bản mới nhất trong file. */
 export async function regeneratePage(pool, x, prompt) {
   const skill = await fs.readFile(SKILL_FILE, 'utf8');
-  let tIn = 0, tOut = 0, lastErr = '';
+  let tIn = 0, tOut = 0, tCached = 0, lastErr = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const msgs = withSkill(skill, prompt);
     if (attempt) msgs.push({ role: 'user', content: `${RETRY_NOTE} Lỗi cụ thể: ${lastErr}.` });
     const r = await chat({ messages: msgs, maxTokens: 14000, temperature: 0.7, timeoutMs: 420000 });
-    tIn += r.tokensIn || 0; tOut += r.tokensOut || 0;
+    tIn += r.tokensIn || 0; tOut += r.tokensOut || 0; tCached += r.tokensCached || 0;
     try {
       if (r.finishReason === 'length' && attempt === 0) throw new Error('HTML bị cắt do quá dài');
-      return await replacePageHtml(pool, x, r.content, { source: 'regen', prompt, tokensIn: tIn, tokensOut: tOut });
+      return await replacePageHtml(pool, x, r.content, { source: 'regen', prompt, tokensIn: tIn, tokensOut: tOut, tokensCached: tCached });
     } catch (e) {
       if (e.status !== 400 && !/bị cắt/.test(e.message)) throw e; // lỗi chụp/DB → không gọi lại LLM
       if (attempt === 1) throw e;

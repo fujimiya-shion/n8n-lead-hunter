@@ -27,39 +27,35 @@ export function leadFacts(lead) {
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 /**
- * Bước lên kế hoạch (1 lời gọi): tin nhắn Zalo + thương hiệu (hướng nghệ thuật, màu, font) + danh sách màn hình kèm brief.
- * oldSite: bản phân tích website cũ (nếu web còn sống) → bộ demo là bản "làm mới" web cũ.
+ * Phần CỐ ĐỊNH của prompt kế hoạch (vai trò, quy tắc, danh sách style/hướng/font, khung JSON).
+ * Provider (MiMo, DeepSeek, OpenAI…) tự cache phần đầu prompt giống hệt lần trước → phần này đặt trước và KHÔNG đổi giữa các lead.
+ * Thay vì xáo trộn danh sách mỗi lần (làm hỏng cache), tạo sẵn vài thứ tự cố định khi khởi động rồi chọn ngẫu nhiên 1 bản
+ * → vẫn giảm thiên vị "chọn mục đầu tiên" mà mỗi bản đều được cache.
  */
-export function planMessages(lead, sender, maxScreens, recent = '', { oldSite = null } = {}) {
-  const system = `Bạn là freelancer người Việt kiêm UI/UX designer và copywriter. Bạn lên kế hoạch bản demo website cho một doanh nghiệp nhỏ
-và viết tin nhắn chào khách. Thiết kế có chủ đích, đúng cá tính của doanh nghiệp và khách hàng của họ, không "giống AI". Chỉ trả lời bằng 1 object JSON hợp lệ.`;
-  const user = `THÔNG TIN KHÁCH:
-${leadFacts(lead)}
-${oldSite ? `
-WEBSITE HIỆN TẠI CỦA KHÁCH — bộ demo là bản LÀM MỚI website này (đã phân tích từ HTML thật):
-${oldSite.brief}
-` : ''}
-NGƯỜI GỬI: ${sender.name} — ${sender.intro}.
+const PLAN_VARIANTS = 6; // mỗi bản chỉ "nguội" ở lần gọi đầu sau khi khởi động → nhiều bản hơn gần như không tốn thêm
+const planSystems = Array.from({ length: PLAN_VARIANTS }, () => `Bạn là freelancer người Việt kiêm UI/UX designer và copywriter. Bạn lên kế hoạch bản demo website cho một doanh nghiệp nhỏ
+và viết tin nhắn chào khách. Thiết kế có chủ đích, đúng cá tính của doanh nghiệp và khách hàng của họ, không "giống AI". Chỉ trả lời bằng 1 object JSON hợp lệ.
+Thông tin cụ thể (THÔNG TIN KHÁCH, NGƯỜI GỬI, WEBSITE HIỆN TẠI nếu có, các demo gần đây) nằm ở tin nhắn của người dùng.
 
-VIỆC 1 — "message": tin nhắn Zalo gửi chủ "${lead.name}"
+VIỆC 1 — "message": tin nhắn Zalo gửi chủ doanh nghiệp
 - 3 đến 5 câu, dưới 600 ký tự. Xưng "em", gọi "anh/chị". Mở đầu tự nhiên, KHÔNG "Kính gửi", "Xin chào Quý khách".
 - Nhắc đúng 1 điểm cụ thể, có thật của shop lấy từ THÔNG TIN KHÁCH. Không bịa.
-- ${oldSite ? 'Nói em đã làm thử bản LÀM MỚI giao diện cho website hiện tại (giữ nội dung, làm lại giao diện), gửi kèm ảnh để anh/chị xem. Được nhắc nhẹ 1 điểm yếu cụ thể của web cũ, không chê bai.' : 'Nói em đã làm thử bản demo giao diện cho shop (vài màn hình), gửi kèm ảnh để anh/chị xem.'}
+- Nếu KHÔNG có WEBSITE HIỆN TẠI: nói em đã làm thử bản demo giao diện cho shop (vài màn hình), gửi kèm ảnh để anh/chị xem.
+- Nếu CÓ WEBSITE HIỆN TẠI: nói em đã làm thử bản LÀM MỚI giao diện cho website hiện tại (giữ nội dung, làm lại giao diện), gửi kèm ảnh để anh/chị xem. Được nhắc nhẹ 1 điểm yếu cụ thể của web cũ, không chê bai.
 - Kết bằng 1 câu hỏi mở nhẹ nhàng. Không ép mua, không nói giá. Tối đa 1 emoji. Không dùng cụm sáo rỗng ("giải pháp toàn diện", "nâng tầm", "bứt phá").
-- Ký tên "${sender.name}" ở dòng cuối.
+- Ký tên NGƯỜI GỬI ở dòng cuối.
 - CHỈ viết tiếng Việt có dấu: tuyệt đối không chèn chữ Hán/Trung, chữ Nhật, chữ Hàn hay câu tiếng Anh.
 
 VIỆC 2 — "brand": nhận diện cho bộ demo, hợp với nghiệp vụ thật (xem NGHIỆP VỤ THẬT) và KHÁCH HÀNG của doanh nghiệp:
 - "style": PHONG CÁCH THỊ GIÁC (cảm xúc, màu, font, hình khối, hoạ tiết). Hỏi: khách của doanh nghiệp này là ai, họ cần cảm thấy gì khi vào web?
   (vd trường mầm non → vui tươi rực rỡ; công ty B2B → hiện đại chuyên nghiệp; phòng khám → sạch sẽ đáng tin; tiệm vàng/spa cao cấp → sang trọng).
-  KHÔNG mặc định "minimal" — chỉ chọn minimal khi doanh nghiệp thật sự hợp tối giản. Chọn 1 trong:
+  KHÔNG mặc định "minimal" — chỉ chọn minimal khi doanh nghiệp thật sự hợp tối giản. Chọn 1 trong (danh sách không theo thứ tự ưu tiên):
 ${shuffle(Object.entries(VISUAL_STYLES)).map(([k, v]) => `  · ${k} — ${v.name} (hợp với: ${v.fits})`).join('\n')}
 - "direction": HƯỚNG NGHỆ THUẬT = ngôn ngữ BỐ CỤC chung cho cả bộ demo (khác với style). Chọn 1 hướng hợp với nội dung và style đã chọn (danh sách không theo thứ tự ưu tiên):
 ${shuffle(Object.entries(DIRECTIONS)).map(([k, d]) => `  · ${k} — ${d.name}: ${d.desc}`).join('\n')}
 - "colors" (mã hex): primary (màu chính, đủ đậm để làm nền nút chữ trắng), accent (nhấn), secondary và highlight (2 màu phụ — phong cách nhiều màu như vui tươi thì cho rực rỡ, phong cách tối giản thì để gần accent), ink (màu chữ), surface (nền trang).
-  ${oldSite?.colors?.length ? `WEBSITE CŨ ĐANG DÙNG CÁC MÀU: ${oldSite.colors.join(', ')}${oldSite.primary ? ` (màu thương hiệu chính: ${oldSite.primary})` : ''}.
-  → BẮT BUỘC giữ đúng bộ màu này (primary = màu thương hiệu chính của web cũ; accent/secondary lấy từ các màu còn lại nếu hợp) để khách nhận ra thương hiệu của mình; chỉ chỉnh độ đậm/nhạt khi cần cho dễ đọc. Style chọn sao cho hợp với bộ màu và nghiệp vụ.`
-    : 'Chọn theo style và cá tính riêng của doanh nghiệp (không mặc định xanh than/nền kem).'}
+  Không có website cũ → chọn theo style và cá tính riêng của doanh nghiệp (không mặc định xanh than/nền kem).
+  Có website cũ kèm danh sách màu → làm theo yêu cầu về màu trong tin nhắn người dùng (giữ đúng bộ màu cũ).
 - Font (có tiếng Việt). Chọn theo style; tiêu đề có thể lấy ở mọi nhóm, thân bài chỉ lấy ở nhóm "không chân" hoặc "có chân":
   · không chân: ${shuffle([...FONTS.sans]).join(', ')}
   · có chân: ${shuffle([...FONTS.serif]).join(', ')}
@@ -67,15 +63,16 @@ ${shuffle(Object.entries(DIRECTIONS)).map(([k, d]) => `  · ${k} — ${d.name}: 
   · đứng hẹp, mạnh: ${FONTS.condensed.join(', ')}
   · viết tay (chỉ cho tiêu đề ngắn): ${FONTS.script.join(', ')}
   · đơn cách (mã sản phẩm, thông số; không dùng cho thân bài): ${FONTS.mono.join(', ')}
-${recent ? `- CÁC DEMO GẦN ĐÂY (chỉ để tránh trùng bố cục/font khi có lựa chọn tương đương; style và màu vẫn ưu tiên đúng doanh nghiệp${oldSite?.colors?.length ? ' và web cũ' : ''}): ${recent}\n` : ''}
-VIỆC 3 — "screens": các MÀN HÌNH của bộ demo (1 đến ${maxScreens}) để chủ shop xem ảnh là hình dung được website và trải nghiệm khách hàng của chính ngành mình.
+- Nếu có CÁC DEMO GẦN ĐÂY: chỉ dùng để tránh trùng bố cục/font khi có lựa chọn tương đương; style và màu vẫn ưu tiên đúng doanh nghiệp (và web cũ nếu có).
+
+VIỆC 3 — "screens": các MÀN HÌNH của bộ demo (số lượng tối đa ghi trong tin nhắn người dùng) để chủ shop xem ảnh là hình dung được website và trải nghiệm khách hàng của chính ngành mình.
 - Màn hình đầu BẮT BUỘC là Trang chủ đầy đủ, "kind": "page" (header → các khối → footer).
 - Các màn hình sau: "section" (một phần nội dung cắt ra, không header/footer — vd dự án, bảng giá, ước tính chi phí) hoặc "modal" (hộp thoại nổi — vd form đặt lịch, chọn gói).
-- Nghĩ xem khách của ngành này thật sự cần làm gì trên website (vd xây dựng: xem dự án, ước tính chi phí; nhà hàng: thực đơn, đặt bàn…). Không theo khuôn có sẵn nào.${oldSite ? `
-- Bản làm mới: trang chủ giữ các nội dung chính của trang chủ cũ (được sắp xếp lại hợp lý hơn); màn hình sau ưu tiên các trang/mục CÓ THẬT trên web cũ (theo menu).` : ''}
+- Nghĩ xem khách của ngành này thật sự cần làm gì trên website (vd xây dựng: xem dự án, ước tính chi phí; nhà hàng: thực đơn, đặt bàn…). Không theo khuôn có sẵn nào.
+- Bản làm mới (có WEBSITE HIỆN TẠI): trang chủ giữ các nội dung chính của trang chủ cũ (được sắp xếp lại hợp lý hơn); màn hình sau ưu tiên các trang/mục CÓ THẬT trên web cũ (theo menu).
 - "brief": 2–4 câu CHỈ nói màn hình giúp khách làm gì và cần nội dung gì (vd: "khách muốn biết chi phí trước khi gọi → cần đơn giá theo hạng mục và cách tính").
   KHÔNG mô tả bố cục, thứ tự khối, kiểu hero, lưới, màu, font (designer quyết ở bước sau).
-  Chỉ đòi thông tin có trong THÔNG TIN KHÁCH${oldSite ? ' / WEBSITE HIỆN TẠI' : ''}; thông tin chưa có (giờ mở cửa, năm thành lập, số khách, bảng giá chính thức…) thì ghi "chưa có, để dạng cập nhật sau" hoặc bỏ qua.
+  Chỉ đòi thông tin có trong THÔNG TIN KHÁCH / WEBSITE HIỆN TẠI; thông tin chưa có (giờ mở cửa, năm thành lập, số khách, bảng giá chính thức…) thì ghi "chưa có, để dạng cập nhật sau" hoặc bỏ qua.
 
 Trả về JSON đúng khung:
 {
@@ -83,7 +80,27 @@ Trả về JSON đúng khung:
   "brand": { "style": "khoá phong cách thị giác", "direction": "khoá hướng nghệ thuật", "logo_text": "tên ngắn gọn để làm logo", "illustration": "1 danh từ TIẾNG ANH tượng trưng cho doanh nghiệp (vd tooth, glasses, car, house, book)",
              "colors": { "primary": "#...", "accent": "#...", "secondary": "#...", "highlight": "#...", "ink": "#...", "surface": "#..." }, "font_heading": "...", "font_body": "..." },
   "screens": [ { "slug": "trang-chu", "title": "tên màn hình tiếng Việt", "kind": "page|section|modal", "brief": "..." } ]
-}`;
+}`);
+
+/**
+ * Bước lên kế hoạch (1 lời gọi): tin nhắn Zalo + thương hiệu (hướng nghệ thuật, màu, font) + danh sách màn hình kèm brief.
+ * system = phần cố định (được cache); user = dữ liệu riêng của lead.
+ * oldSite: bản phân tích website cũ (nếu web còn sống) → bộ demo là bản "làm mới" web cũ.
+ */
+export function planMessages(lead, sender, maxScreens, recent = '', { oldSite = null } = {}) {
+  const system = planSystems[Math.floor(Math.random() * PLAN_VARIANTS)];
+  const user = `THÔNG TIN KHÁCH:
+${leadFacts(lead)}
+${oldSite ? `
+WEBSITE HIỆN TẠI CỦA KHÁCH — bộ demo là bản LÀM MỚI website này (đã phân tích từ HTML thật):
+${oldSite.brief}
+` : '\nWEBSITE HIỆN TẠI: không có (thiết kế mới hoàn toàn).\n'}${oldSite?.colors?.length ? `
+MÀU WEBSITE CŨ: ${oldSite.colors.join(', ')}${oldSite.primary ? ` (màu thương hiệu chính: ${oldSite.primary})` : ''}.
+→ BẮT BUỘC giữ đúng bộ màu này (primary = màu thương hiệu chính của web cũ; accent/secondary lấy từ các màu còn lại nếu hợp) để khách nhận ra thương hiệu của mình; chỉ chỉnh độ đậm/nhạt khi cần cho dễ đọc. Style chọn sao cho hợp với bộ màu và nghiệp vụ.
+` : ''}
+NGƯỜI GỬI: ${sender.name} — ${sender.intro}. (tin nhắn gửi chủ "${lead.name}", ký tên "${sender.name}")
+SỐ MÀN HÌNH: 1 đến ${maxScreens}.
+${recent ? `CÁC DEMO GẦN ĐÂY: ${recent}\n` : ''}`;
   return [{ role: 'system', content: system }, { role: 'user', content: user }];
 }
 
@@ -99,12 +116,14 @@ export function withSkill(skill, prompt) {
 /** Phần prompt HTML có thể lưu/chỉnh trên trang 8082: system = quy tắc đầu ra (skill được ghép riêng), user = đề bài */
 export function htmlPrompt(lead, brand, screen, screens, { hasShopPhoto = false, recent = '', oldSite = null } = {}) {
   const c = brand.colors;
-  const others = screens.filter((x) => x.slug !== screen.slug).map((x) => `- ${x.title} (${x.kind}): ${x.brief || ''}`).join('\n');
+  const all = screens.map((x) => `- ${x.title} (${x.kind}): ${x.brief || ''}`).join('\n'); // giống nhau ở mọi màn hình → nằm trong phần được cache
   const kindRule = {
     page: 'Dạng PAGE: trang đầy đủ, mở đầu bằng <header data-section="header"> và kết thúc bằng <footer data-section="footer">. Phần giữa (số khối, loại khối, thứ tự, cách mở đầu trang) do bạn tự thiết kế; mỗi khối lớn có data-section. Viết TRỌN trang, không dừng giữa chừng.',
     section: 'Dạng SECTION: chỉ phần nội dung này (1–3 khối liền nhau), KHÔNG header, KHÔNG footer.',
     modal: 'Dạng MODAL: nền trang giả lập phía sau (đơn giản, mờ) + lớp phủ tối + hộp thoại ở giữa có data-section="modal", gọn trong khung 1440×900.',
   }[screen.kind] || '';
+  // Thứ tự có chủ đích để tận dụng cache prompt của provider: phần chung của cả bộ demo (khách, phong cách, thương hiệu, web cũ, quy tắc)
+  // đứng trước và giống hệt nhau giữa các màn hình; phần riêng của màn hình đặt CUỐI.
   const user = `THÔNG TIN KHÁCH:
 ${leadFacts(lead)}
 
@@ -119,19 +138,22 @@ ${brand.style ? `PHONG CÁCH THỊ GIÁC CỦA CẢ BỘ DEMO — ${visualText(b
 - Màu (đã cấu hình thành class Tailwind): primary ${c.primary}, accent ${c.accent}, secondary ${c.secondary || c.accent}, highlight ${c.highlight || c.accent}, ink ${c.ink}, surface ${c.surface} (vd bg-secondary, text-highlight, bg-highlight/20, border-secondary)
 - Font tiêu đề: ${brand.font_heading} (class font-head) · Font thân bài: ${brand.font_body}
 
-MÀN HÌNH CẦN THIẾT KẾ: "${screen.title}"
-Mục đích & nội dung cần có: ${screen.brief || '—'}
-${kindRule}
-
-Các màn hình khác trong bộ demo (để nội dung khớp nhau; bố cục mỗi màn hình tự thiết kế riêng):
-${others || 'không có'}
-
 ${hasShopPhoto ? `ẢNH THẬT CỦA SHOP: có 1 ảnh chụp thật của shop. Đặt nó ở một vị trí nổi bật do bạn chọn bằng thẻ <img data-shop-photo alt="..." class="..."> (chỉ 1 lần trong màn hình này; ảnh có thể chất lượng vừa phải nên dùng object-cover, khung vừa phải). Các ảnh khác vẫn dùng <img data-query="từ khoá tiếng Anh">.\n\n` : ''}${oldSite ? `WEBSITE CŨ CỦA KHÁCH — đây là bản LÀM MỚI (đã phân tích từ HTML thật):
 ${oldSite.briefWithPhotos}
 Cách làm mới: giữ cấu trúc thông tin và NỘI DUNG THẬT của web cũ (tên dịch vụ, giá, giờ, địa chỉ, cam kết… dùng nguyên văn, sửa lỗi chính tả nếu có),
 nhưng thiết kế lại hoàn toàn cho hiện đại, rõ ràng, dễ dùng trên điện thoại và khắc phục các điểm yếu đã nêu. Được sắp xếp lại thứ tự khối nếu hợp lý hơn;
-KHÔNG sao chép giao diện cũ. Ảnh thật từ web cũ ưu tiên hơn ảnh stock.\n\n` : ''}${recent && screen.kind === 'page' && !oldSite ? `${recent}\n\n` : ''}KHÔNG bịa số liệu về doanh nghiệp (số năm hoạt động, số công trình, số khách, GIỜ MỞ CỬA...) nếu THÔNG TIN KHÁCH${oldSite ? ' và WEBSITE CŨ' : ''} không có (giờ mở cửa chưa biết thì ghi "Giờ làm việc: cập nhật sau" hoặc bỏ qua) — dùng nội dung định tính hoặc số đánh giá Google thật. ĐÁNH GIÁ / REVIEW CỦA KHÁCH (nếu màn hình có khối này): KHÔNG bịa lời khách. Nội dung trích dẫn dùng chữ giữ chỗ Lorem ipsum (1–2 câu), tên người dạng "Khách hàng A/B/C"; điểm sao và số lượt đánh giá Google thật thì được dùng (vẽ sao bằng <i data-lucide="star" class="h-4 w-4 fill-current text-accent">, đủ số sao theo điểm). Đặt ngay dưới tiêu đề khối 1 dòng ghi chú chữ nhỏ, màu nhạt: "Nội dung đánh giá minh hoạ — khi làm website thật em sẽ đưa đánh giá thật của khách lên, anh/chị xem qua giao diện là được ạ."
-KHÔNG viết câu khẳng định ảnh là "ảnh thật / ảnh chụp tại công trình của shop" (ảnh minh hoạ là ảnh stock).\n\nBạn toàn quyền quyết định bố cục và các khối nội dung, đúng nghiệp vụ thật của doanh nghiệp (xem NGHIỆP VỤ THẬT). Viết nội dung tiếng Việt thật. Trả về HTML.`;
+KHÔNG sao chép giao diện cũ. Ảnh thật từ web cũ ưu tiên hơn ảnh stock.\n\n` : ''}KHÔNG bịa số liệu về doanh nghiệp (số năm hoạt động, số công trình, số khách, GIỜ MỞ CỬA...) nếu THÔNG TIN KHÁCH${oldSite ? ' và WEBSITE CŨ' : ''} không có (giờ mở cửa chưa biết thì ghi "Giờ làm việc: cập nhật sau" hoặc bỏ qua) — dùng nội dung định tính hoặc số đánh giá Google thật. ĐÁNH GIÁ / REVIEW CỦA KHÁCH (nếu màn hình có khối này): KHÔNG bịa lời khách. Nội dung trích dẫn dùng chữ giữ chỗ Lorem ipsum (1–2 câu), tên người dạng "Khách hàng A/B/C"; điểm sao và số lượt đánh giá Google thật thì được dùng (vẽ sao bằng <i data-lucide="star" class="h-4 w-4 fill-current text-accent">, đủ số sao theo điểm). Đặt ngay dưới tiêu đề khối 1 dòng ghi chú chữ nhỏ, màu nhạt: "Nội dung đánh giá minh hoạ — khi làm website thật em sẽ đưa đánh giá thật của khách lên, anh/chị xem qua giao diện là được ạ."
+KHÔNG viết câu khẳng định ảnh là "ảnh thật / ảnh chụp tại công trình của shop" (ảnh minh hoạ là ảnh stock).
+
+Bạn toàn quyền quyết định bố cục và các khối nội dung, đúng nghiệp vụ thật của doanh nghiệp (xem NGHIỆP VỤ THẬT). Viết nội dung tiếng Việt thật. Trả về HTML.
+
+Các màn hình trong bộ demo (để nội dung khớp nhau; bố cục mỗi màn hình tự thiết kế riêng; mỗi lần chỉ thiết kế 1 màn hình):
+${all}
+
+=== PHẦN RIÊNG CỦA MÀN HÌNH NÀY ===
+MÀN HÌNH CẦN THIẾT KẾ: "${screen.title}"
+Mục đích & nội dung cần có: ${screen.brief || '—'}
+${kindRule}${recent && screen.kind === 'page' && !oldSite ? `\n\n${recent}` : ''}`;
   return { system: HTML_RULE, user };
 }
 

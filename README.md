@@ -95,6 +95,7 @@ Mỗi lead:
 2. **Lên kế hoạch** (1 lời gọi): tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật) + thương hiệu (hướng nghệ thuật trong
    `studio/src/directions.js`, màu, font) + danh sách màn hình (trang chủ, rồi các section/modal hợp nghiệp vụ) kèm brief.
 3. **Viết HTML/Tailwind** từng màn hình (song song) theo skill `studio/skills/frontend-design.md`; HTML hỏng thì gọi lại 1 lần kèm lỗi.
+   *Cache prompt:* phần cố định (skill, quy tắc, danh sách style/font, thông tin chung của lead) luôn đặt ở đầu prompt để provider tự cache; màn hình đầu gửi trước `LLM_CACHE_WARM_MS` (mặc định 4000 ms) rồi mới gửi các màn hình còn lại. Tỉ lệ token trúng cache hiện trên thanh trên cùng của trang 8082.
 4. **Ảnh**:
    - **Ảnh thật của shop**: ảnh đại diện Google Maps (gosom) hoặc ảnh bìa fanpage (`businesses.photo_url`), và ảnh thật từ web cũ.
    - **Ảnh stock**: Pixabay → Unsplash → Pexels → Openverse; **MiMo xem ảnh thu nhỏ** và loại ảnh sai ngành
