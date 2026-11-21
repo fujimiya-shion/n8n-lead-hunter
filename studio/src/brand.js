@@ -6,9 +6,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 export const FONTS = {
   sans: ['Be Vietnam Pro', 'Inter', 'Montserrat', 'Nunito', 'Quicksand', 'Lexend', 'Roboto', 'Open Sans', 'Plus Jakarta Sans',
     'Manrope', 'Archivo', 'Epilogue', 'Barlow', 'Josefin Sans', 'Space Grotesk', 'Bricolage Grotesque'],
-  serif: ['Playfair Display', 'Lora', 'Merriweather', 'Roboto Slab', 'Noto Serif', 'Cormorant Garamond', 'Prata'],
-  rounded: ['Baloo 2', 'Mali', 'Comfortaa', 'Grandstander', 'Itim', 'Patrick Hand'],
-  condensed: ['Oswald', 'Anton', 'Barlow Condensed', 'Saira Condensed', 'Chakra Petch'],
+  mono: ['Space Mono', 'JetBrains Mono'],
+  serif: ['Playfair Display', 'Lora', 'Merriweather', 'Roboto Slab', 'Noto Serif', 'Cormorant Garamond', 'Prata', 'Fraunces'],
+  rounded: ['Baloo 2', 'Mali', 'Comfortaa', 'Grandstander', 'Itim', 'Patrick Hand', 'Bangers'],
+  condensed: ['Oswald', 'Anton', 'Barlow Condensed', 'Saira Condensed', 'Chakra Petch', 'Phudu'],
   script: ['Pacifico', 'Lobster', 'Dancing Script'],
 };
 const ALL_FONTS = Object.values(FONTS).flat();

@@ -66,6 +66,7 @@ ${shuffle(Object.entries(DIRECTIONS)).map(([k, d]) => `  · ${k} — ${d.name}: 
   · tròn/vui: ${FONTS.rounded.join(', ')}
   · đứng hẹp, mạnh: ${FONTS.condensed.join(', ')}
   · viết tay (chỉ cho tiêu đề ngắn): ${FONTS.script.join(', ')}
+  · đơn cách (mã sản phẩm, thông số; không dùng cho thân bài): ${FONTS.mono.join(', ')}
 ${recent ? `- CÁC DEMO GẦN ĐÂY (chỉ để tránh trùng bố cục/font khi có lựa chọn tương đương; style và màu vẫn ưu tiên đúng doanh nghiệp${oldSite?.colors?.length ? ' và web cũ' : ''}): ${recent}\n` : ''}
 VIỆC 3 — "screens": các MÀN HÌNH của bộ demo (1 đến ${maxScreens}) để chủ shop xem ảnh là hình dung được website và trải nghiệm khách hàng của chính ngành mình.
 - Màn hình đầu BẮT BUỘC là Trang chủ đầy đủ, "kind": "page" (header → các khối → footer).
