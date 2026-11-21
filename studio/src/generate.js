@@ -1,16 +1,14 @@
-// Tạo bộ demo cho 1 lead, 2 tab song song:
-//   • "llm"     — MiMo tự viết HTML (Tailwind) cho từng màn hình theo skill front-end (skills/frontend-design.md)
-//   • "generic" — thư viện thành phần có sẵn (phương án dự phòng cuối cùng)
-// Màn hình: trang chủ (page) + các màn hình section/modal do LLM chọn theo ngành.
+// Tạo bộ demo cho 1 lead: (phân tích web cũ nếu còn sống) → 1 lời gọi lên kế hoạch (tin nhắn + thương hiệu + màn hình)
+// → MiMo viết HTML (Tailwind) cho từng màn hình theo skill front-end (skills/frontend-design.md) → chụp → chấm điểm.
+// Màn hình: trang chủ (page) + các màn hình section/modal do LLM chọn theo nghiệp vụ.
 // Mỗi màn hình: dựng HTML → ghi file tạm → Playwright chụp → XOÁ file tạm. Chỉ giữ ảnh chụp + nội dung để dựng lại.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chat, parseJson, MODEL, JUDGE_MODEL } from './llm.js';
-import { planMessages, pageMessages, llmScreensMessages, htmlPrompt, withSkill, judgeMessages, CLICHES } from './prompts.js';
-import { normalizePlan, normalizePage, normalizeScreens } from './spec.js';
-import { renderPage, renderSections } from './components.js';
-import { resolvePageMedia, illustration, shopPhoto } from './images.js';
+import { planMessages, htmlPrompt, withSkill, judgeMessages, CLICHES } from './prompts.js';
+import { normalizePlan } from './spec.js';
+import { illustration, shopPhoto } from './images.js';
 import { buildLlmPage } from './llmhtml.js';
 import { oldSiteUrl, analyzeOldSite, oldSiteBrief, sitePhotoUrls } from './oldsite.js';
 import { shootPage } from './screenshot.js';
@@ -50,9 +48,9 @@ async function recentDesigns(pool, n = 6) {
   const uniq = (a) => [...new Set(a.filter(Boolean))];
   const brands = r.rows.map((x) => x.brand || {});
   const last = brands[0];
-  const brand = `bản gần nhất: hướng nghệ thuật ${last.direction || '—'}, phong cách ${last.style}, font tiêu đề ${last.font_heading}, màu chính ${last.colors?.primary} → bản này phải khác cả 4. `
+  const brand = `bản gần nhất: hướng nghệ thuật ${last.direction || '—'}, font tiêu đề ${last.font_heading}, màu chính ${last.colors?.primary} → bản này phải khác cả 3. `
     + `Hướng nghệ thuật đã dùng gần đây: ${uniq(brands.map((b) => b.direction)).join(', ') || 'chưa có'}. `
-    + `Đã dùng gần đây — phong cách: ${uniq(brands.map((b) => b.style)).join(', ')}; font tiêu đề: ${uniq(brands.map((b) => b.font_heading)).join(', ')}; `
+    + `Đã dùng gần đây — font tiêu đề: ${uniq(brands.map((b) => b.font_heading)).join(', ')}; `
     + `màu chính: ${uniq(brands.map((b) => b.colors?.primary)).join(', ')}. Ưu tiên lựa chọn chưa dùng.`;
   const kinds = r.rows.map((x) => {
     const home = (x.llm_pages || []).find((p) => p.kind === 'page');
@@ -78,6 +76,9 @@ function humanPenalty(message) {
   if (emojis > 2) { p += 10; issues.push(`Nhiều emoji (${emojis})`); }
   if (message.length > 700) { p += 10; issues.push(`Tin nhắn dài (${message.length} ký tự)`); }
   if (message.length < 150) { p += 10; issues.push('Tin nhắn quá ngắn'); }
+  // MiMo thỉnh thoảng lọt chữ Hán/Nhật/Hàn vào tiếng Việt
+  const cjk = message.match(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]+/g);
+  if (cjk) { p += 25; issues.push(`Tin nhắn lọt chữ nước ngoài: "${cjk.join(' ')}" — sửa trước khi gửi`); }
   return { p, issues };
 }
 
@@ -114,7 +115,7 @@ export async function generateForLead(pool, businessId) {
     `UPDATE outreach SET status = 'skipped', updated_at = now(), error = 'thay bằng bản tạo lại'
      WHERE business_id = $1 AND status IN ('generating','draft','approved')`, [businessId]);
   const id = (await pool.query(
-    `INSERT INTO outreach (business_id, status, model, template) VALUES ($1, 'generating', $2, 'two-track-v1') RETURNING id`,
+    `INSERT INTO outreach (business_id, status, model, template) VALUES ($1, 'generating', $2, 'llm-v2') RETURNING id`,
     [businessId, MODEL])).rows[0].id;
 
   let tokensIn = 0, tokensOut = 0;
@@ -132,119 +133,83 @@ export async function generateForLead(pool, businessId) {
   try {
     const lead = await loadLead(pool, businessId);
     const sender = { name: await setting(pool, 'outreach_sender_name', 'em'), intro: await setting(pool, 'outreach_sender_intro', 'em làm website') };
-    const maxPages = Math.max(1, Math.min(6, Number(await setting(pool, 'outreach_max_pages', 4)) || 4));
+    const maxScreens = Math.max(1, Math.min(6, Number(await setting(pool, 'outreach_max_pages', 4)) || 4));
     const concurrency = Math.max(1, Math.min(8, Number(await setting(pool, 'outreach_llm_concurrency', 4)) || 4));
     const skill = await fs.readFile(SKILL_FILE, 'utf8');
     const recent = await recentDesigns(pool).catch(() => ({ brand: '', layout: '' }));
-    // Tab generic: on = luôn chạy · fallback = chỉ khi tab LLM hỏng hết (mặc định, tiết kiệm token) · off = tắt
-    const genericMode = ['on', 'off', 'fallback'].includes(await setting(pool, 'outreach_generic_track', 'fallback'))
-      ? await setting(pool, 'outreach_generic_track', 'fallback') : 'fallback';
     const photo = await shopPhoto(pool, businessId).catch(() => null);
-    // Web cũ còn sống → fetch HTML + 1 lần LLM phân tích (cache 30 ngày) → làm bản "làm mới" thay vì thiết kế từ con số 0
     const prompts = {};
-    const preIssues = [];
+    const issues = [];
+
+    // 1) Web cũ còn sống → fetch HTML + 1 lần LLM phân tích (cache 30 ngày) → làm bản "làm mới" thay vì thiết kế từ con số 0
     let old = null;
     if (String(await setting(pool, 'outreach_old_site', 'true')) !== 'false' && oldSiteUrl(lead)) {
       try {
         const r = await analyzeOldSite(pool, lead, askJson);
         if (r) { old = r.analysis; if (r.prompt) prompts.oldsite = r.prompt; }
-      } catch (e) { preIssues.push(`Không đọc được web cũ (${String(e.message || e).slice(0, 80)}) → thiết kế mới hoàn toàn`); }
+      } catch (e) { issues.push(`Không đọc được web cũ (${String(e.message || e).slice(0, 80)}) → thiết kế mới hoàn toàn`); }
     }
     const oldSite = old ? {
       brief: oldSiteBrief(old), briefWithPhotos: oldSiteBrief(old, { withPhotos: true }),
       primary: /^#[0-9a-f]{6}$/i.test(old.brand?.primary || '') ? old.brand.primary : '',
+      // màu xuất hiện nhiều trong CSS web cũ (đã bỏ xám/đen/trắng) → kế hoạch giữ đúng bộ màu này
+      colors: [...new Set([old.brand?.primary, ...(old.colors || [])].filter((c) => /^#[0-9a-f]{6}$/i.test(c || '')).map((c) => c.toLowerCase()))].slice(0, 5),
     } : null;
+
+    // 2) Kế hoạch (1 lời gọi): tin nhắn + thương hiệu + danh sách màn hình
+    prompts.plan = planMessages(lead, sender, maxScreens, recent.brand, { oldSite });
+    const plan = normalizePlan(await askJson(prompts.plan, 5000), maxScreens);
+    if (!plan.message) throw new Error('LLM không trả về tin nhắn');
+    const screens = plan.screens.length ? plan.screens : [{ slug: 'trang-chu', title: 'Trang chủ', kind: 'page', brief: '' }];
+    await fs.rm(shotsDir(id), { recursive: true, force: true });
+    const brandSvg = await illustration(pool, plan.brand.illustration);
     const imgCtx = {
       industry: `${lead.name} (${lead.industry})`, // tên giúp MiMo duyệt ảnh đúng nghiệp vụ thật
       check: String(await setting(pool, 'outreach_image_check', 'true')) !== 'false',
       minFit: Number(await setting(pool, 'outreach_image_min_fit', 60)) || 60,
-      shopPhoto: photo,
-      sitePhotos: old?.photo_urls || [],
-      onTokens: track,
+      shopPhoto: photo, sitePhotos: old?.photo_urls || [], onTokens: track,
     };
 
-    // 1) Kế hoạch: tin nhắn + thương hiệu. Danh sách trang của template generic chỉ xin khi tab generic bật "on".
-    prompts.plan = planMessages(lead, sender, maxPages, recent.brand, { withPages: genericMode === 'on', oldSite });
-    const plan = normalizePlan(await askJson(prompts.plan, 4000), maxPages);
-    if (!plan.message) throw new Error('LLM không trả về tin nhắn');
-    let views = plan.pages;
-    await fs.rm(shotsDir(id), { recursive: true, force: true });
-    const brandSvg = await illustration(pool, plan.brand.illustration);
-
-    // 2) Tab "LLM tự thiết kế": LLM TỰ QUYẾT bộ màn hình (độc lập với kế hoạch của template generic)
-    let screens = [];
-    prompts.screens = llmScreensMessages(lead, maxPages, { oldSite });
-    try { screens = normalizeScreens(await askJson(prompts.screens, 2500), maxPages); }
-    catch (e) { /* không lên được danh sách màn hình → tab LLM trống, tab generic vẫn chạy */ }
-
-    // 3) Lời gọi LLM chạy song song (giới hạn `concurrency`): HTML từng màn hình của LLM (+ nội dung generic nếu bật "on")
+    // 3) HTML từng màn hình, gọi LLM song song (giới hạn `concurrency`)
     const htmlOpts = { hasShopPhoto: Boolean(photo), recent: recent.layout, oldSite };
     const promptOf = (sc) => htmlPrompt(lead, plan.brand, sc, screens, htmlOpts); // lưu vào DB, sửa được trên trang 8082
-    const genericCalls = () => views.map((v) => () => askJson(pageMessages(lead, plan, v), 12000));
-    const results = await limited([
-      ...screens.map((sc) => () => askHtml(withSkill(skill, promptOf(sc)))),
-      ...(genericMode === 'on' ? genericCalls() : []),
-    ], concurrency);
-    const llmRes = results.slice(0, screens.length);
-    let genRes = results.slice(screens.length);
+    const first = await limited(screens.map((sc) => () => askHtml(withSkill(skill, promptOf(sc)))), concurrency);
 
-    // 4) Dựng + chụp lần lượt — mỗi tab theo danh sách màn hình của riêng nó
-    const shots = [], summaries = [], issues = [...preIssues], genericPages = [], llmPages = [];
+    // 4) Kiểm tra → dựng → chụp lần lượt; hỏng thì gọi lại 1 lần kèm lỗi cụ thể
+    const shots = [], summaries = [], pages = [];
     for (const [i, screen] of screens.entries()) {
       try {
-        let res = llmRes[i].status === 'fulfilled' ? llmRes[i].value : null;
-        let html, lastErr = '';
+        let res = first[i].status === 'fulfilled' ? first[i].value : null;
+        let html, lastErr = first[i].status === 'rejected' ? String(first[i].reason?.message || first[i].reason).slice(0, 160) : '';
         for (let attempt = 0; attempt < 2 && !html; attempt++) {
           try {
             if (!res) res = await askHtml(withSkill(skill, promptOf(screen)), attempt ? `${RETRY_NOTE} Lỗi cụ thể: ${lastErr}.` : '');
-            if (res.cut && attempt === 0) throw new Error('HTML bị cắt do quá dài'); // lần đầu bị cắt → gọi lại bản gọn hơn
+            if (res.cut && attempt === 0) throw new Error('HTML bị cắt do quá dài');
             html = await buildLlmPage(pool, { raw: res.html, plan, view: screen, lead, brandSvg, ctx: imgCtx });
           } catch (e) {
             if (attempt === 1) throw e;
             lastErr = String(e.message || e).slice(0, 160);
-            res = null; // thử lại kèm lời nhắc
+            res = null;
           }
         }
         const r = await shootHtml(html, { id, view: screen, track: 'llm' });
         shots.push(...r.shots);
-        llmPages.push({ ...screen, html: res.html, truncated: res.cut, prompt: promptOf(screen) });
+        pages.push({ ...screen, html: res.html, truncated: res.cut, prompt: promptOf(screen) });
         summaries.push(`[${screen.title} · ${screen.kind}]\n${r.summary}`);
         if (res.cut) issues.push(`HTML màn hình "${screen.title}" bị cắt do quá dài`);
       } catch (e) {
         issues.push(`LLM không thiết kế được "${screen.title}": ${String(e.message).slice(0, 100)}`);
       }
     }
-    let homeBody = '';
-    if (genericMode === 'on' || (genericMode === 'fallback' && !llmPages.length)) {
-      if (!views.length) { // fallback: plan chưa có danh sách trang → xin riêng (chỉ khi tab LLM hỏng hết)
-        try { views = normalizePlan(await askJson(planMessages(lead, sender, maxPages, '', { withPages: true }), 4000), maxPages).pages; } catch { views = []; }
-      }
-      if (!genRes.length) genRes = await limited(genericCalls(), concurrency); // fallback: tab LLM hỏng hết → mới tốn token cho generic
-      for (const [i, view] of views.entries()) {
-        try {
-          if (genRes[i].status === 'rejected') throw genRes[i].reason;
-          const sections = normalizePage(genRes[i].value, view);
-          const credits = await resolvePageMedia(pool, sections, imgCtx);
-          if (view.kind === 'page') homeBody = renderSections({ plan, sections, lead, credits, brandSvg });
-          const html = renderPage({ plan, page: view, sections, lead, credits, brandSvg, homeBody });
-          const r = await shootHtml(html, { id, view, track: 'generic' });
-          shots.push(...r.shots);
-          genericPages.push({ ...view, credits, sections: sections.map(({ illustrationSvg, ...s }) => s) });
-          if (!llmPages.length) summaries.push(`[${view.title} · ${view.kind}]\n${r.summary}`);
-        } catch (e) {
-          if (i === 0) issues.push(`Template generic lỗi trang chủ: ${String(e.message).slice(0, 100)}`);
-        }
-      }
-    }
     if (!shots.length) throw new Error(`Không chụp được màn hình nào. ${issues.join(' · ')}`);
 
-    // 5) Chấm điểm (ưu tiên bản LLM tự thiết kế)
+    // 5) Chấm điểm
     prompts.judge = judgeMessages(lead, plan.message, summaries.join('\n\n'), { oldSite });
     const jr = track(await chat({ model: JUDGE_MODEL, messages: prompts.judge, maxTokens: 1500, temperature: 0, json: true }));
     let judge;
     try { judge = parseJson(jr.content); } catch { judge = { human_score: 50, fit_score: 50, issues: ['Không đọc được kết quả chấm điểm'] }; }
     const hp = humanPenalty(plan.message);
-    const fitPenalty = (screens.length - llmPages.length) * 10 + (llmPages.length ? 0 : 20);
+    const fitPenalty = (screens.length - pages.length) * 10;
     const leadScore = Math.min(Number(lead.score) || 0, 100);
     const human = Math.max(0, Math.min(100, Math.round(Number(judge.human_score) || 0) - hp.p));
     const fit = Math.max(0, Math.min(100, Math.round(Number(judge.fit_score) || 0) - fitPenalty));
@@ -258,11 +223,12 @@ export async function generateForLead(pool, businessId) {
     await pool.query(
       `UPDATE outreach SET status = 'draft', message = $2, message_original = $2, demo_title = $3,
          lead_score = $4, human_score = $5, fit_score = $6, confidence = $7, judge_issues = $8,
-         tokens_in = $9, tokens_out = $10, site_plan = $11, pages = $12, llm_pages = $13, shots = $14, prompts = $15, error = NULL, updated_at = now()
+         tokens_in = $9, tokens_out = $10, site_plan = $11, llm_pages = $12, shots = $13, prompts = $14, error = NULL, updated_at = now()
        WHERE id = $1`,
-      [id, plan.message, (llmPages.length ? llmPages : views).map((p) => p.title).join(' · '), leadScore, human, fit, confidence, JSON.stringify(allIssues),
-        tokensIn, tokensOut, JSON.stringify({ ...plan, llm_screens: screens, old_site: old ? { url: old.url, via: old.via } : null }), JSON.stringify(genericPages), JSON.stringify(llmPages), JSON.stringify(shots), JSON.stringify(prompts)]);
-    for (const p of llmPages) {
+      [id, plan.message, pages.map((p) => p.title).join(' · '), leadScore, human, fit, confidence, JSON.stringify(allIssues),
+        tokensIn, tokensOut, JSON.stringify({ brand: plan.brand, screens, old_site: old ? { url: old.url, via: old.via } : null }),
+        JSON.stringify(pages), JSON.stringify(shots), JSON.stringify(prompts)]);
+    for (const p of pages) {
       await pool.query(`INSERT INTO page_versions (outreach_id, slug, source, prompt, html) VALUES ($1, $2, 'llm', $3, $4)`,
         [id, p.slug, JSON.stringify(p.prompt), p.html]);
     }
@@ -273,7 +239,6 @@ export async function generateForLead(pool, businessId) {
     throw e;
   }
 }
-
 
 // ---------- sửa 1 màn hình sau khi đã tạo (trang 8082): sửa tay HTML hoặc chỉnh prompt rồi gen lại ----------
 async function loadLeadOf(pool, o) { return loadLead(pool, o.business_id); }

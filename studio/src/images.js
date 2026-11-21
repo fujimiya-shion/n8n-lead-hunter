@@ -254,23 +254,3 @@ export async function shopPhoto(pool, businessId) {
   if (!url) return null;
   try { return await toDataUri(bigMapsPhoto(url)); } catch { return null; }
 }
-
-export async function resolvePageMedia(pool, sections, ctx = {}) {
-  const credits = new Set();
-  const used = new Set();
-  const pick = async (img) => {
-    if (!img) return null;
-    const url = await pickPhoto(pool, img.query, { used, credits, ctx });
-    return url ? { ...img, url } : null;
-  };
-  let shopUsed = false;
-  for (const s of sections) {
-    // ảnh thật của shop ưu tiên cho hero / giới thiệu (1 lần)
-    if (ctx.shopPhoto && !shopUsed && ['hero', 'about'].includes(s.type)) {
-      s.image = { query: 'shop', alt: s.image?.alt || '', url: ctx.shopPhoto }; shopUsed = true;
-    } else s.image = await pick(s.image);
-    for (const it of s.items) it.image = await pick(it.image);
-    s.illustrationSvg = s.illustration ? await illustration(pool, s.illustration) : null;
-  }
-  return [...credits];
-}

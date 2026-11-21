@@ -2,7 +2,7 @@
 // làm sạch (bỏ script/sự kiện/iframe/emoji) → đổi <i data-lucide> thành SVG → gắn ảnh thật cho <img data-query> → bọc vào khung chung.
 import { icon } from './icons.js';
 import { pickPhoto, sitePhoto } from './images.js';
-import { shell } from './components.js';
+import { shell } from './brand.js';
 
 const escAttr = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const attr = (tag, name) => (tag.match(new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`, 'i')) || tag.match(new RegExp(`\\s${name}\\s*=\\s*'([^']*)'`, 'i')) || [])[1];
@@ -104,5 +104,5 @@ export async function buildLlmPage(pool, { raw, plan, view, lead, brandSvg, ctx 
   }
   const { html, credits } = await resolveHtmlImages(pool, cleaned, { brandSvg, monogram, ctx });
   const credit = credits.length ? `<div class="py-3 text-center text-xs text-muted">Ảnh: ${credits.join(', ')}</div>` : '';
-  return shell({ plan, style: plan.brand.style, title: `${view.title} – ${name}`, body: html + (view.kind === 'page' ? credit : '') });
+  return shell({ plan, title: `${view.title} – ${name}`, body: html + (view.kind === 'page' ? credit : '') });
 }

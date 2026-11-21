@@ -25,7 +25,9 @@ export async function chat({ model = MODEL, messages, maxTokens = 4000, temperat
   let useJsonMode = json;
   let useThinking = THINKING === 'disabled' || THINKING === 'enabled';
   let lastErr;
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  // chạy song song nhiều lead → dễ gặp 429: thử lại tối đa 6 lần, chờ lâu dần + ngẫu nhiên để các lời gọi không cùng thử lại một lúc
+  const backoff = (attempt, retryAfter) => sleep(retryAfter ? retryAfter * 1000 : Math.min(60000, 4000 * 2 ** (attempt - 1)) * (0.6 + Math.random() * 0.8));
+  for (let attempt = 1; attempt <= 6; attempt++) {
     const body = { model, messages, temperature, max_tokens: maxTokens };
     if (useJsonMode) body.response_format = { type: 'json_object' };
     if (useThinking) body.thinking = { type: THINKING };
@@ -42,7 +44,7 @@ export async function chat({ model = MODEL, messages, maxTokens = 4000, temperat
         if (res.status === 400 && useThinking && /thinking/i.test(text)) { useThinking = false; continue; }
         if (res.status === 400 && useJsonMode && /response_format|json/i.test(text)) { useJsonMode = false; continue; }
         const err = new Error(`LLM HTTP ${res.status}: ${text.slice(0, 300)}`);
-        if (res.status === 429 || res.status >= 500) { lastErr = err; await sleep(3000 * attempt); continue; }
+        if (res.status === 429 || res.status >= 500) { lastErr = err; await backoff(attempt, Number(res.headers.get('retry-after')) || 0); continue; }
         throw err;
       }
       const data = JSON.parse(text);
@@ -56,7 +58,8 @@ export async function chat({ model = MODEL, messages, maxTokens = 4000, temperat
     } catch (e) {
       if (e.message?.startsWith('LLM HTTP 4')) throw e;
       lastErr = e;
-      await sleep(3000 * attempt);
+      if (attempt >= 4) break; // lỗi mạng / quá thời gian: tối đa 4 lần
+      await backoff(attempt);
     }
   }
   throw lastErr;

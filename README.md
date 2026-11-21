@@ -82,32 +82,30 @@ Hẹn gọi lại: điền cột `next_call_at` → lead hiện trên 📅 Lịc
 
 ## Demo web & tin nhắn chào hàng (Lead Studio)
 
-Service `studio` (thư mục `studio/`, Node + Playwright). Mỗi lượt chạy tạo demo cho `settings.outreach_per_run` lead
-(mặc định 5). Lead được chọn khi ở trạng thái `to_contact`, có SĐT và có điểm ≥ `outreach_min_lead_score`. Không có ngành nào bị hardcode.
+Service `studio` (thư mục `studio/`, Node + Playwright). Trang quản trị: http://localhost:8082
 
-1. **Lên kế hoạch** (JSON): LLM viết tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật của shop) và chọn nhận diện thương hiệu
-   (1 phong cách, màu, font cho cả bộ demo).
-2. **Tab "LLM tự thiết kế"**: LLM tự quyết định shop cần những màn hình nào. Màn hình đầu là trang chủ đầy đủ, các màn hình sau
-   là section hoặc modal. Mỗi màn hình được viết bằng HTML/Tailwind theo skill `studio/skills/frontend-design.md`.
-3. **Tab "Template generic"**: dựng bằng thư viện thành phần có sẵn (`studio/src/components.js`). Bật/tắt bằng
-   `settings.outreach_generic_track`:
-   - `fallback` (mặc định): chỉ chạy khi tab LLM hỏng hết. Cách này tiết kiệm khoảng 40–50% token.
-   - `on`: luôn chạy.
-   - `off`: tắt hẳn.
+**Chọn lead để tạo demo:** trang **Lead đã crawl** liệt kê toàn bộ lead (lọc theo ngành, khu vực, website, điểm, trạng thái demo).
+Tick các lead muốn làm → **Tạo demo** → lead vào **hàng đợi** (bảng `generate_queue`, chạy lần lượt, huỷ được lead chưa chạy;
+studio khởi động lại thì lead đang chạy dở được chạy lại). Lịch 10:00 chỉ tự tạo demo khi bật `outreach_auto_generate`
+(khi đó lấy `outreach_per_run` lead `to_contact` có SĐT, điểm ≥ `outreach_min_lead_score`). Không có ngành nào bị hardcode.
+
+Mỗi lead:
+1. **Web cũ còn sống** (`outreach_old_site`): fetch HTML trang chủ + vài trang con, làm gọn bằng code, LLM phân tích 1 lần
+   (nội dung thật, bố cục, điểm yếu, ảnh thật; cache 30 ngày ở `site_snapshots`) → bộ demo là bản **làm mới** web cũ.
+2. **Lên kế hoạch** (1 lời gọi): tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật) + thương hiệu (hướng nghệ thuật trong
+   `studio/src/directions.js`, màu, font) + danh sách màn hình (trang chủ, rồi các section/modal hợp nghiệp vụ) kèm brief.
+3. **Viết HTML/Tailwind** từng màn hình (song song) theo skill `studio/skills/frontend-design.md`; HTML hỏng thì gọi lại 1 lần kèm lỗi.
 4. **Ảnh**:
-   - **Ảnh thật của shop**: lấy ảnh đại diện trên Google Maps (gosom) hoặc ảnh bìa fanpage, lưu ở `businesses.photo_url`.
-     Nếu chưa có, studio tự tìm nhanh trên gosom (khoảng 1 phút). Ảnh này được đặt ở hero hoặc phần giới thiệu.
-   - **Ảnh stock**: lấy theo thứ tự Pixabay → Unsplash → Pexels → Openverse. Trước khi dùng, **MiMo xem ảnh thu nhỏ**
-     và loại các ảnh sai ngành. Bật/tắt bằng `outreach_image_check`; ngưỡng là `outreach_image_min_fit` (60).
-     Kết quả được cache theo ngành + từ khoá. Nếu không có ảnh đạt ngưỡng, trang dùng khối màu kèm hình minh hoạ.
-5. **Playwright chụp** từng màn hình: ảnh toàn trang desktop, ảnh mobile, và từng khối `data-section`.
-   Nếu không nhận ra khối nào, trang được cắt theo chiều cao màn hình. File HTML tạm bị xoá ngay sau khi chụp.
-   Xem trước thư viện thành phần (nội dung mẫu, không tốn token): http://localhost:8082/preview
-6. **LLM chấm** `human` (tự nhiên như người viết) và `fit` (demo khớp ngành và tên shop), cộng thêm luật trừ điểm cụm sáo rỗng.
-   `confidence = 0.4 × điểm lead + 0.3 × human + 0.3 × fit`. Từ `outreach_ready_threshold` (80) trở lên được gắn nhãn **Sẵn sàng**.
+   - **Ảnh thật của shop**: ảnh đại diện Google Maps (gosom) hoặc ảnh bìa fanpage (`businesses.photo_url`), và ảnh thật từ web cũ.
+   - **Ảnh stock**: Pixabay → Unsplash → Pexels → Openverse; **MiMo xem ảnh thu nhỏ** và loại ảnh sai ngành
+     (`outreach_image_check`, ngưỡng `outreach_image_min_fit`). Không có ảnh đạt → khối màu kèm hình minh hoạ.
+5. **Playwright chụp** từng màn hình: toàn trang desktop, mobile, từng khối `data-section`. File HTML tạm bị xoá ngay sau khi chụp.
+6. **LLM chấm** `human` (tự nhiên như người viết) và `fit` (đúng nghiệp vụ), cộng luật trừ điểm cụm sáo rỗng.
+   `confidence = 0.4 × điểm lead + 0.3 × human + 0.3 × fit`. Từ `outreach_ready_threshold` (80) trở lên là **Sẵn sàng**.
    Confidence chỉ để **xếp hạng**, không dùng để tự gửi.
-7. **Trang duyệt** http://localhost:8082: sửa tin nhắn (tự lưu), duyệt hoặc bỏ qua hàng loạt,
-   copy SĐT, tin nhắn, ảnh (dán thẳng vào Zalo). Tự gửi xong bấm **Đã gửi** → lead chuyển `contacted`.
+7. **Duyệt & gửi** (trang quản trị): xem ảnh từng màn hình, sửa tin nhắn (tự lưu), mở/sửa HTML hoặc chỉnh prompt rồi gen lại
+   (`/edit/<id>/<màn hình>`, lịch sử ở `page_versions`), duyệt → trang **Gửi tin** copy SĐT, tin nhắn, ảnh (dán thẳng vào Zalo).
+   Tự gửi xong bấm **Tôi đã gửi** → lead chuyển `contacted`. Các cài đặt `outreach_*` sửa ở trang **Cài đặt**.
 
 LLM: mọi provider tương thích OpenAI (DeepSeek, Gemini, OpenRouter...). Cấu hình `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`
 (và `LLM_JUDGE_MODEL` nếu muốn dùng model khác để chấm) trong `.env`, rồi chạy `docker compose up -d studio`.
