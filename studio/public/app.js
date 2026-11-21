@@ -128,11 +128,12 @@ function Shell() {
     { key: 'leads', icon: html`<${I.TeamOutlined} />`, label: 'Lead đã crawl' },
     { key: 'demos', icon: html`<${I.AppstoreOutlined} />`, label: html`<span>Duyệt demo ${c.draft ? html`<${A.Badge} count=${c.draft} size="small" style=${{ marginLeft: 6 }} />` : null}</span>` },
     { key: 'send', icon: html`<${I.SendOutlined} />`, label: html`<span>Gửi tin ${c.approved ? html`<${A.Badge} count=${c.approved} size="small" color="#1677ff" style=${{ marginLeft: 6 }} />` : null}</span>` },
+    { key: 'sent', icon: html`<${I.CheckCircleOutlined} />`, label: html`<span>Đã gửi ${c.followups_due ? html`<${A.Tooltip} title="Đến hạn gọi lại"><${A.Badge} count=${c.followups_due} size="small" style=${{ marginLeft: 6 }} /><//>` : null}</span>` },
     { key: 'settings', icon: html`<${I.SettingOutlined} />`, label: 'Cài đặt' },
   ];
-  const titles = { leads: 'Lead đã crawl', demos: 'Duyệt demo', send: 'Gửi tin', settings: 'Cài đặt', demo: `Chi tiết demo #${route[1] || ''}`, edit: 'Sửa màn hình' };
+  const titles = { leads: 'Lead đã crawl', demos: 'Duyệt demo', send: 'Gửi tin', sent: 'Đã gửi · theo dõi khách', settings: 'Cài đặt', demo: `Chi tiết demo #${route[1] || ''}`, edit: 'Sửa màn hình' };
   const ctx = { status, refreshStatus, version, openDemo: setDrawerId, route };
-  const Page = { leads: LeadsPage, demos: DemosPage, send: SendPage, settings: SettingsPage, demo: DemoPage, edit: EditorPage }[page] || LeadsPage;
+  const Page = { leads: LeadsPage, demos: DemosPage, send: SendPage, settings: SettingsPage, sent: SentPage, demo: DemoPage, edit: EditorPage }[page] || LeadsPage;
   const menuKey = { demo: 'demos', edit: 'demos' }[page] || page;
   return html`<${Ctx.Provider} value=${ctx}>
     <${A.Layout} style=${{ minHeight: '100vh' }}>
@@ -629,6 +630,101 @@ function SendPage() {
           <//>
         <//>
       <//>`}
+    <//>
+  <//>`;
+}
+
+// ---------------------------------------------------------------- trang: Đã gửi (theo dõi khách sau khi nhắn)
+const LEAD_STATUS = [
+  { value: 'contacted', label: 'Đã liên hệ', color: 'blue' },
+  { value: 'interested', label: 'Quan tâm', color: 'gold' },
+  { value: 'won', label: 'Chốt', color: 'green' },
+  { value: 'lost', label: 'Thất bại', color: 'red' },
+  { value: 'skip', label: 'Bỏ qua', color: 'default' },
+  { value: 'to_contact', label: 'Cần gọi', color: 'cyan' },
+  { value: 'new', label: 'Mới', color: 'default' },
+];
+const endOfToday = () => dayjs().endOf('day');
+const isDue = (r) => r.next_call_at && dayjs(r.next_call_at).isBefore(endOfToday()) && ['contacted', 'interested'].includes(r.lead_status);
+
+function SentPage() {
+  const { version, openDemo, refreshStatus } = useStudio();
+  const { message } = A.App.useApp();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [q, setQ] = useState('');
+  const load = useCallback(async (silent) => {
+    if (!silent) setLoading(true);
+    try { setRows(await api('/api/sent')); } catch (e) { message.error(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(false); }, [load]);
+  useEffect(() => { if (version) load(true); }, [version]);
+
+  const update = async (r, patch, okMsg) => {
+    setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, ...patch, ...(patch.status ? { lead_status: patch.status } : {}) } : x)));
+    try { await api(`/api/leads/${r.business_id}`, { method: 'PATCH', body: patch }); if (okMsg) message.success(okMsg); refreshStatus(); }
+    catch (e) { message.error(e.message); load(true); }
+  };
+  const count = (f) => rows.filter(f).length;
+  const FILTERS = [
+    { value: 'all', label: `Tất cả (${rows.length})`, f: () => true },
+    { value: 'due', label: `Cần gọi lại hôm nay (${count(isDue)})`, f: isDue },
+    { value: 'contacted', label: `Chưa phản hồi (${count((r) => r.lead_status === 'contacted')})`, f: (r) => r.lead_status === 'contacted' },
+    { value: 'interested', label: `Quan tâm (${count((r) => r.lead_status === 'interested')})`, f: (r) => r.lead_status === 'interested' },
+    { value: 'won', label: `Chốt (${count((r) => r.lead_status === 'won')})`, f: (r) => r.lead_status === 'won' },
+    { value: 'lost', label: `Thất bại / bỏ (${count((r) => ['lost', 'skip'].includes(r.lead_status))})`, f: (r) => ['lost', 'skip'].includes(r.lead_status) },
+  ];
+  const f = FILTERS.find((x) => x.value === filter) || FILTERS[0];
+  const shown = rows.filter(f.f).filter((r) => !q || `${r.name} ${r.phone} ${r.industry} ${r.area} ${r.note || ''}`.toLowerCase().includes(q.toLowerCase()));
+  const won = count((r) => r.lead_status === 'won'), interested = count((r) => r.lead_status === 'interested');
+
+  const columns = [
+    { title: '', key: 'thumb', width: 64, render: (_, r) => { const s = thumbShot(r); return s ? html`<img src=${shotUrl(r, s.file)} style=${{ width: 44, height: 72, objectFit: 'cover', objectPosition: 'top', borderRadius: 6, border: '1px solid #f0f0f0', display: 'block' }} />` : null; } },
+    { title: 'Lead', key: 'lead', render: (_, r) => html`<div style=${{ minWidth: 220 }}>
+        <${A.Button} type="link" style=${{ padding: 0, height: 'auto', fontWeight: 600, whiteSpace: 'normal', textAlign: 'left' }} onClick=${() => openDemo(r.id)}>${r.name}<//>
+        <div><${Text} type="secondary" style=${{ fontSize: 12 }}>${[r.industry, r.area].filter(Boolean).join(' · ')}</${Text}></div>
+        <${A.Space} size=${10}>
+          ${r.phone ? html`<${Text} copyable=${{ tooltips: ['Copy SĐT', 'Đã copy'] }} style=${{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>${r.phone}</${Text}>` : html`<${Text} type="secondary" style=${{ fontSize: 12 }}>Không có SĐT</${Text}>`}
+          ${r.facebook_url && html`<${A.Tooltip} title="Fanpage"><a href=${r.facebook_url} target="_blank"><${I.FacebookOutlined} /></a><//>`}
+          ${r.maps_url && html`<${A.Tooltip} title="Google Maps"><a href=${r.maps_url} target="_blank"><${I.EnvironmentOutlined} /></a><//>`}
+        <//>
+      </div>` },
+    { title: 'Đã gửi', dataIndex: 'sent_at', key: 'sent', width: 130, sorter: (a, b) => Date.parse(a.sent_at || 0) - Date.parse(b.sent_at || 0), defaultSortOrder: 'descend',
+      render: (v) => html`<${A.Tooltip} title=${ago(v)}><span>${v ? dayjs(v).format('DD/MM HH:mm') : '—'}<div><${Text} type="secondary" style=${{ fontSize: 12 }}>${v ? `${Math.max(0, dayjs().diff(dayjs(v), 'day'))} ngày trước` : ''}</${Text}></div></span><//>` },
+    { title: 'Tin nhắn', dataIndex: 'message', key: 'msg', width: 90, render: (v) => html`<${A.Popover} title="Tin nhắn đã gửi" content=${html`<div style=${{ maxWidth: 380, whiteSpace: 'pre-wrap', fontSize: 13 }}>${v}</div>`}>
+        <${A.Button} size="small" icon=${html`<${I.MessageOutlined} />`}>Xem<//><//>` },
+    { title: 'Trạng thái', key: 'status', width: 160, render: (_, r) => html`<${A.Select} size="small" style=${{ width: 140 }} value=${r.lead_status}
+        options=${LEAD_STATUS.map((s) => ({ value: s.value, label: html`<${A.Badge} color=${s.color === 'default' ? '#bfbfbf' : s.color} text=${s.label} />` }))}
+        onChange=${(v) => update(r, { status: v }, `Đã chuyển sang "${LEAD_STATUS.find((s) => s.value === v).label}"`)} />` },
+    { title: 'Hẹn gọi lại', key: 'call', width: 210, sorter: (a, b) => Date.parse(a.next_call_at || '9999') - Date.parse(b.next_call_at || '9999'),
+      render: (_, r) => html`<${A.Space} size=${4}>
+        <${A.DatePicker} size="small" showTime=${{ format: 'HH:mm', minuteStep: 15 }} format="DD/MM HH:mm" placeholder="Chọn ngày giờ"
+          status=${isDue(r) ? 'error' : undefined} style=${{ width: 150 }} value=${r.next_call_at ? dayjs(r.next_call_at) : null}
+          presets=${[{ label: 'Chiều nay 15:00', value: dayjs().hour(15).minute(0) }, { label: 'Sáng mai 9:00', value: dayjs().add(1, 'day').hour(9).minute(0) },
+            { label: '3 ngày nữa', value: dayjs().add(3, 'day').hour(9).minute(0) }, { label: '1 tuần nữa', value: dayjs().add(7, 'day').hour(9).minute(0) }]}
+          onChange=${(v) => update(r, { next_call_at: v ? v.toISOString() : null }, v ? `Hẹn gọi lại ${v.format('DD/MM HH:mm')}` : 'Đã bỏ hẹn')} />
+        ${isDue(r) && html`<${A.Tooltip} title="Đến hạn gọi lại"><${I.BellFilled} style=${{ color: '#ff4d4f' }} /><//>`}
+      <//>` },
+    { title: 'Ghi chú', key: 'note', render: (_, r) => html`<${Paragraph} style=${{ margin: 0, minWidth: 180, fontSize: 13 }}
+        editable=${{ tooltip: 'Sửa ghi chú', text: r.note || '', onChange: (v) => v !== (r.note || '') && update(r, { note: v }, 'Đã lưu ghi chú') }}>
+        ${r.note || html`<${Text} type="secondary">—</${Text}>`}</${Paragraph}>` },
+  ];
+
+  return html`<${A.Space} direction="vertical" size=${16} style=${{ width: '100%' }}>
+    <${A.Row} gutter=${16}>
+      ${[['Đã gửi', rows.length, null], ['Cần gọi lại hôm nay', count(isDue), count(isDue) ? '#ff4d4f' : null], ['Quan tâm', interested, '#faad14'],
+        ['Chốt', won, '#52c41a'], ['Tỉ lệ chốt', rows.length ? `${Math.round((won / rows.length) * 100)}%` : '—', null]].map(([t, v, c]) => html`<${A.Col} key=${t} xs=${12} md=${8} xl=${4}>
+        <${A.Card} size="small"><${A.Statistic} title=${t} value=${v} valueStyle=${c ? { color: c } : undefined} /><//>
+      <//>`)}
+    <//>
+    <${A.Card} size="small" styles=${{ body: { padding: 0 } }}
+      title=${html`<${A.Segmented} value=${filter} onChange=${setFilter} options=${FILTERS.map(({ value, label }) => ({ value, label }))} />`}
+      extra=${html`<${A.Input} prefix=${html`<${I.SearchOutlined} />`} placeholder="Tìm tên, SĐT, ghi chú…" allowClear style=${{ width: 240 }} value=${q} onChange=${(e) => setQ(e.target.value)} />`}>
+      <${A.Table} rowKey=${(r) => String(r.id)} size="middle" loading=${loading} columns=${columns} dataSource=${shown} scroll=${{ x: 1100 }}
+        rowClassName=${(r) => (isDue(r) ? 'row-due' : '')}
+        pagination=${{ pageSize: 30, hideOnSinglePage: true, showTotal: (n) => `${n} lead` }}
+        locale=${{ emptyText: html`<${A.Empty} description=${filter === 'all' ? 'Chưa gửi cho khách nào. Duyệt demo rồi dùng trang Gửi tin, bấm "Tôi đã gửi" để lead hiện ở đây.' : 'Không có lead nào'} />` }} />
     <//>
   <//>`;
 }

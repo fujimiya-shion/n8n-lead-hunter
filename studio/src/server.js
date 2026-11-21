@@ -109,6 +109,9 @@ app.get('/api/status', async () => {
        count(*) FILTER (WHERE status = 'skipped')    AS skipped,
        count(*) FILTER (WHERE status IN ('draft','approved') AND confidence >= $1) AS ready,
        count(*) FILTER (WHERE status = 'sent' AND sent_at > now() - interval '7 days') AS sent_7d,
+       (SELECT count(*) FROM outreach o2 JOIN businesses b ON b.id = o2.business_id
+         WHERE o2.status = 'sent' AND b.next_call_at < date_trunc('day', now()) + interval '1 day'
+           AND b.status IN ('contacted', 'interested')) AS followups_due,
        coalesce(sum(tokens_in), 0) AS tokens_in, coalesce(sum(tokens_out), 0) AS tokens_out
      FROM outreach`, [threshold])).rows[0];
   const counts = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, Number(v)]));
@@ -190,6 +193,35 @@ app.get('/api/leads', async (req) => {
 app.get('/api/leads/facets', async () => {
   const f = async (col) => (await pool.query(`SELECT ${col} AS v, count(*)::int AS n FROM a_leads WHERE ${col} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`)).rows;
   return { industry: await f('industry'), area: await f('area'), website: await f('website_label'), status: await f('status_label || \'|\' || status'), source: await f('source') };
+});
+
+// ---------- đã gửi: theo dõi khách sau khi nhắn (trạng thái lead, hẹn gọi lại, ghi chú) ----------
+app.get('/api/sent', async () => (await pool.query(
+  `SELECT o.id, o.business_id, o.message, o.confidence, o.sent_at, o.shots, left(md5(coalesce(o.shots::text, '')), 10) AS shots_v,
+          o.site_plan->'brand' AS brand, b.name, b.phone, b.status::text AS lead_status, status_label(b.status::text) AS lead_status_label,
+          b.note, b.next_call_at, b.contacted_at, l.industry, l.area, l.website_label, l.rating, l.review_count, l.maps_url, l.facebook_url
+   FROM outreach o JOIN businesses b ON b.id = o.business_id JOIN a_leads l ON l.id = o.business_id
+   WHERE o.status = 'sent' ORDER BY o.sent_at DESC NULLS LAST, o.id DESC LIMIT 1000`)).rows);
+
+// Cập nhật lead: trạng thái / ghi chú / hẹn gọi lại (null = bỏ hẹn)
+const LEAD_STATUSES = ['new', 'to_contact', 'contacted', 'interested', 'won', 'lost', 'skip'];
+app.patch('/api/leads/:id', async (req, reply) => {
+  const id = Number(req.params.id);
+  const b = req.body || {};
+  const sets = [], args = [id];
+  if (b.status !== undefined) {
+    if (!LEAD_STATUSES.includes(b.status)) return reply.code(400).send({ error: 'Trạng thái không hợp lệ' });
+    args.push(b.status); sets.push(`status = $${args.length}::lead_status`);
+  }
+  if (b.note !== undefined) { args.push(String(b.note ?? '').slice(0, 4000) || null); sets.push(`note = $${args.length}`); }
+  if (b.next_call_at !== undefined) {
+    const t = b.next_call_at ? new Date(b.next_call_at) : null;
+    if (t && Number.isNaN(t.getTime())) return reply.code(400).send({ error: 'Ngày hẹn không hợp lệ' });
+    args.push(t ? t.toISOString() : null); sets.push(`next_call_at = $${args.length}`);
+  }
+  if (!sets.length) return reply.code(400).send({ error: 'Không có gì để cập nhật' });
+  const r = await pool.query(`UPDATE businesses SET ${sets.join(', ')} WHERE id = $1`, args);
+  return r.rowCount ? { ok: true } : reply.code(404).send({ error: 'Không có lead này' });
 });
 
 // ---------- cài đặt (chỉ các khoá của studio) ----------
