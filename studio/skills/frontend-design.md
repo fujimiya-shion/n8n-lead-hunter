@@ -45,7 +45,7 @@ Không dùng cỡ chữ tùy tiện. Áp dụng đúng thang đo và `line-heigh
 
 | Vai trò | Class Tailwind chuẩn | Quy tắc sử dụng |
 | :--- | :--- | :--- |
-| **Eyebrow / Kicker** | `text-xs font-semibold uppercase tracking-[0.14em] text-primary` | 2–4 từ định danh section. Đặt phía trên H1/H2 (`mb-3`). Tối đa 50% số section dùng Eyebrow. |
+| **Eyebrow / Kicker** | `text-xs font-semibold uppercase tracking-[0.14em] text-primary` | 2–4 từ định danh section. Không bắt buộc; tối đa 1/3 số section dùng Eyebrow, có hướng nghệ thuật không dùng chút nào. |
 | **H1 (Hero — duy nhất 1 cái)** | `font-head text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold leading-[1.08] tracking-[-0.02em] text-ink` | 6–12 từ. Tối đa 3 dòng trên desktop. |
 | **H2 (Tiêu đề Section)** | `font-head text-2xl sm:text-3xl lg:text-[2.25rem] font-semibold leading-[1.15] tracking-[-0.015em] text-ink` | 4–10 từ. |
 | **H3 (Tiêu đề Card / Bước)** | `font-head text-lg sm:text-xl font-semibold leading-[1.3] tracking-[-0.01em] text-ink` | 2–6 từ. Không viết cả câu dài. |
@@ -66,7 +66,7 @@ Chọn **DUY NHẤT 1 hệ** phù hợp với ngành nghề và giữ đồng b�
 | **Badge / Pill / Tag** | `rounded-sm` | `rounded-md` | `rounded-full` |
 
 ### 2.4. Hệ thống Bề mặt, Viền & Độ sâu (Surface & Elevation)
-- **Tỉ lệ màu 60 – 30 – 10:** 60% `bg-surface` — 30% `bg-soft` (xen kẽ giữa các section để tạo nhịp) — 10% `bg-primary` / `bg-accent` (chỉ cho Primary CTA, trạng thái active, điểm nhấn nhỏ).
+- **Tỉ lệ màu:** mặc định 60% `bg-surface` — 30% `bg-soft` — 10% `bg-primary` / `bg-accent`; hướng nghệ thuật được phép đổi tỉ lệ (vd nền tối chiếm phần lớn, hoặc mảng màu đặc lớn). Không xen kẽ surface/soft một cách máy móc.
 - **Phân tách bằng viền thay vì bóng đổ:**
   - Card trên nền `bg-surface`: `bg-surface border border-line`.
   - Card trên nền `bg-soft`: `bg-surface border border-line/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)]`.
@@ -76,39 +76,26 @@ Chọn **DUY NHẤT 1 hệ** phù hợp với ngành nghề và giữ đồng b�
 
 ---
 
-## 3. Kiến trúc Lưới & 6 Mẫu Bố cục Chuẩn (Layout Blueprints)
+## 3. Kiến trúc Lưới & Từ vựng Bố cục
 
-Container chuẩn: `mx-auto max-w-6xl px-5 sm:px-6 lg:px-8`.
-**Quy tắc chống nhàm chán:** Không bao giờ dùng 2 section liên tiếp có cùng cấu trúc lưới. Mặc định căn lề trái (`text-left`); chỉ căn giữa (`text-center`) cho CTA cuối trang hoặc tiêu đề bảng giá đối xứng.
+**Bố cục do HƯỚNG NGHỆ THUẬT của bộ demo (được giao trong đề bài) + nội dung thật của doanh nghiệp quyết định.** Phần dưới là từ vựng để chọn, KHÔNG phải khuôn: không có cách nào là mặc định, không chọn theo thứ tự liệt kê. Cấm dựng lại "landing page mặc định" (hero chia đôi chữ trái/ảnh phải + dải 3 chỉ số → tiêu đề trái/danh sách phải → 4 bước ngang → dải CTA bo góc màu chính → footer 4 cột) — nếu bản nháp trong đầu giống chuỗi đó, hãy thiết kế lại theo hướng nghệ thuật.
 
-1. **Split Hero 7/5 (`grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center`):**
-   - Cột trái `lg:col-span-6` hoặc `lg:col-span-7`: Eyebrow + H1 + Lead + Cặp nút CTA + Dòng thông tin tin cậy (`border-t border-line pt-6 mt-8`, 2–3 chỉ số ngắn gọn).
-   - Cột phải `lg:col-span-6` hoặc `lg:col-span-5`: Ảnh thật `aspect-[4/3]` hoặc `aspect-[4/5]`.
-2. **Sticky Left / List Right (`grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14`):**
-   - Cột trái `lg:col-span-4`: Eyebrow + H2 + Lead + 1 nút hoặc link.
-   - Cột phải `lg:col-span-8`: Danh sách dịch vụ/quy trình dạng `divide-y divide-line`.
-3. **Editorial Price / Service List (`divide-y divide-line border-y border-line`):**
-   - Mỗi hàng: `py-5 sm:py-6 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 sm:gap-8`.
-   - Trái: Số thứ tự `text-xs font-mono text-muted w-8` + Tên dịch vụ (`font-head font-medium text-ink`) + Mô tả 1 dòng (`text-sm text-muted`).
-   - Phải: Giá tiền (`font-head text-base font-semibold text-ink tabular-nums shrink-0`).
-4. **Asymmetric Bento Grid (`grid-cols-1 md:grid-cols-12 gap-6`):**
-   - Hàng 1: `md:col-span-7` (card có ảnh ngang + text) và `md:col-span-5` (card nền `bg-soft` hoặc `bg-primary text-on-primary` nhấn mạnh số liệu/cam kết).
-   - Hàng 2: Đảo ngược `md:col-span-5` và `md:col-span-7`.
-5. **Process Horizontal Steps (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8`):**
-   - Mỗi bước có số thứ tự lớn nhạt hoặc badge số (`text-xs font-semibold tabular-nums text-primary`), đường kẻ ngang mảnh `border-t border-line pt-5`, H3 và mô tả tối đa 2 dòng.
-6. **High-Contrast CTA Banner:**
-   - Khối bo góc đồng bộ, nền `bg-primary text-on-primary` (hoặc `bg-ink text-white`), `p-8 sm:p-12 lg:p-14`, bố cục `flex flex-col lg:flex-row lg:items-center justify-between gap-8`.
+Container: chọn độ rộng theo hướng nghệ thuật (`max-w-5xl` / `max-w-6xl` / `max-w-7xl` hoặc tràn mép), padding ngang `px-5 sm:px-6 lg:px-8`.
+**Quy tắc chống nhàm chán:** Không 2 section liên tiếp cùng cấu trúc lưới. Mỗi trang dùng ít nhất 3 kiểu lưới khác nhau (1 cột hẹp, 2 cột lệch, lưới nhiều cột, tràn mép, ô ghép…).
 
----
+**Mở đầu trang:** tiêu đề khổng lồ không ảnh · ảnh tràn toàn chiều ngang có chữ phủ · chia đôi màn hình sát mép · lưới ô (ảnh + giờ mở cửa + đánh giá + nút gọi) · hero gọn kèm ô đặt lịch/tra cứu/chọn dịch vụ ngay · dải ảnh ngang nhiều ảnh nhỏ + tiêu đề · câu hỏi lớn kiểu "Bạn đang cần…?" kèm các lựa chọn bấm được.
+**Dịch vụ / sản phẩm / bảng giá:** lưới thẻ ảnh lớn · bảng kẻ ô có cột giá · tab/chip lọc theo nhóm + lưới · danh sách chữ lớn đánh số · ô bento kích thước khác nhau · thẻ ngang ảnh trái nội dung phải · bảng so sánh gói · menu kiểu nhà hàng 2 cột có đường chấm dẫn tới giá · cuộn ngang (hiện 3,5 thẻ).
+**Quy trình / cách làm việc:** timeline dọc có đường nối · các bước so le trái/phải kèm ảnh · checklist "cần mang gì" · khối câu hỏi–trả lời theo tình huống · thanh tiến trình đánh số · 1 bảng "bước – thời gian – chi phí".
+**Tin cậy / đánh giá:** 1 trích dẫn rất lớn · dải logo/đối tác chữ · ô điểm Google lớn ghép với lời khách · băng chữ chạy ngang · ảnh thực tế kèm chú thích · dãy số liệu trong dòng chữ.
+**Lời mời liên hệ cuối:** khối chia đôi có bản đồ/địa chỉ · form ngắn ngay trên trang · dải mỏng 1 dòng + nút · tiêu đề lớn căn giữa trên nền trơn · thẻ liên hệ nhiều kênh (gọi / Zalo / chỉ đường).
+**Footer:** 1 dòng gọn · 2 cột lớn (thông tin – liên hệ) · nhiều cột link · footer nền tối chữ lớn tên thương hiệu. Chọn theo lượng nội dung thật.
 
 ## 4. Đặc tả Chi tiết Từng Thành phần (Component Anatomy)
 
 ### Header (`data-section="header"`)
-- Chiều cao cố định: `h-16 md:h-20`, nền `bg-surface/95 border-b border-line`.
-- Bên trong: `flex h-full items-center justify-between gap-6`.
-- Trái: Logo chữ `font-head text-lg font-semibold tracking-tight text-ink` kèm 1 icon Lucide nhỏ `h-5 w-5 text-primary` (không tạo logo SVG rườm rà).
-- Giữa: `hidden md:flex items-center gap-7` gồm 4–5 link `text-sm font-medium text-muted hover:text-ink transition-colors`.
-- Phải: SĐT dạng `hidden lg:inline-flex items-center gap-1.5 text-sm font-medium text-ink tabular-nums` + 1 nút Primary CTA gọn (`h-10 px-4 text-sm`). Mobile hiện nút CTA nhỏ + icon `menu` (`h-5 w-5`).
+- Chiều cao gọn (`h-16`–`h-20`), có logo chữ (`font-head`, có thể kèm 1 icon Lucide nhỏ), 3–6 link điều hướng (ẩn trên mobile, thay bằng icon `menu`), SĐT `tabular-nums` và tối đa 1 nút Primary.
+- Luôn là thẻ `<header data-section="header">` đứng đầu trang (kể cả kiểu trong suốt: header `absolute inset-x-0 top-0 z-20` đè lên hero ngay sau nó, KHÔNG nhét menu vào trong khối hero).
+- Kiểu header theo hướng nghệ thuật: thanh trắng viền dưới · trong suốt đè lên ảnh hero · logo giữa link hai bên · thanh trên cùng mỏng chứa SĐT/giờ + thanh menu · nền tối.
 
 ### Buttons (Chuẩn kích thước chạm ≥ 44px)
 - **Primary:** `inline-flex h-11 items-center justify-center gap-2 bg-primary px-5 text-sm font-medium text-on-primary rounded-... hover:opacity-90 transition`.
@@ -126,13 +113,8 @@ Container chuẩn: `mx-auto max-w-6xl px-5 sm:px-6 lg:px-8`.
   - Trạng thái đã kín lịch (tùy chọn): `h-10 rounded-... border border-line/60 bg-soft/40 text-sm text-muted/50 line-through tabular-nums`.
 
 ### Footer (`data-section="footer"`)
-- Nền `bg-surface border-t border-line pt-14 pb-8 md:pt-16`.
-- Lưới `grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-line`:
-  - `lg:col-span-4`: Tên thương hiệu, mô tả 2 dòng (`max-w-xs`), địa chỉ & giờ mở cửa.
-  - `lg:col-span-3`: Dịch vụ chính (4–5 link).
-  - `lg:col-span-2`: Thông tin (3–4 link).
-  - `lg:col-span-3`: Liên hệ trực tiếp (Hotline, Zalo, Email).
-- Hàng đáy: `pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted`.
+- Có: tên thương hiệu, địa chỉ, SĐT/Zalo, (giờ làm việc nếu biết), vài link chính, dòng bản quyền `text-xs text-muted`.
+- Hình thức chọn theo hướng nghệ thuật và lượng nội dung (xem "Footer" ở mục 3); không mặc định lưới 4 cột.
 
 ---
 
@@ -157,8 +139,8 @@ Container chuẩn: `mx-auto max-w-6xl px-5 sm:px-6 lg:px-8`.
 ## 7. Đặc tả 3 Chế độ Đầu ra (`page` / `section` / `modal`)
 
 1. **`page` (Trang chủ hoàn chỉnh):**
-   - Đầy đủ luồng: `header` → `hero` → `trust` (dải chỉ số/cam kết gọn) → `services` → `about`/`process` → `pricing`/`gallery` → `testimonials` → `cta` → `footer`.
-   - Xen kẽ nền `bg-surface` và `bg-soft` rõ ràng giữa các section.
+   - Mở đầu bằng `header`, kết thúc bằng `footer`. Phần giữa: loại khối, số lượng, THỨ TỰ và cách mở đầu trang do mục đích màn hình + ngành quyết định, không theo một luồng cố định. Màn hình đầu tiên khách thấy phải cho biết ngay shop làm gì và cách liên hệ.
+   - Tạo nhịp nền có chủ đích giữa các section (sáng / `bg-soft` / khối tối / viền kẻ), không lặp một kiểu xen kẽ máy móc.
 2. **`section` (Một phần cắt ra):**
    - CHỈ xuất section được yêu cầu (1–3 khối `data-section`). KHÔNG `header`, KHÔNG `hero`, KHÔNG `footer`.
    - Có đủ nền (`bg-surface` hoặc `bg-soft`) và padding dọc (`py-16 md:py-24`) để chụp riêng vẫn đẹp trọn vẹn.

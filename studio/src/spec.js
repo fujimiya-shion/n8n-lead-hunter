@@ -1,3 +1,4 @@
+import { DIRECTIONS, DIRECTION_KEYS } from './directions.js';
 // Response spec: LLM trả JSON theo spec này → parseJson → normalize → JS object an toàn để dựng trang.
 // Thư viện thành phần CHUNG cho mọi ngành; LLM tự chọn trang, section, variant, phong cách.
 import { STYLES, DEFAULT_STYLE, normalizeColors, pickFont } from './styles.js';
@@ -90,6 +91,8 @@ export function normalizePlan(raw, maxPages = 4) {
     message: String(r.message || '').trim().slice(0, 1500),
     brand: {
       style: siteStyle,
+      // hướng nghệ thuật cho tab LLM; LLM trả sai tên → chọn ngẫu nhiên (không mặc định 1 hướng)
+      direction: DIRECTIONS[b.direction] ? b.direction : DIRECTION_KEYS[Math.floor(Math.random() * DIRECTION_KEYS.length)],
       logo_text: str(b.logo_text, 40),
       illustration: kw(b.illustration),
       colors,
@@ -145,8 +148,9 @@ export function normalizeScreens(raw, max = 4) {
     return {
       slug,
       title: str(x.title, 50, `Màn hình ${i + 1}`),
-      kind: ['page', 'section', 'modal'].includes(x.kind) ? x.kind : 'section',
-      brief: str(x.brief, 400),
+      // màn hình đầu luôn là Trang chủ (page); các màn hình sau chỉ là section hoặc modal
+      kind: i === 0 ? 'page' : (x.kind === 'modal' ? 'modal' : 'section'),
+      brief: str(x.brief, 1000),
     };
   }).filter((x) => x.title);
 }

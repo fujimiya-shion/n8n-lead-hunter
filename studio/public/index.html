@@ -163,7 +163,7 @@ function ring(v, size = 52) {
     <div class="absolute inset-0 grid place-items-center text-sm font-semibold tabular-nums">${v}</div></div>`;
 }
 const hasShots = (r) => Array.isArray(r.shots) && r.shots.length > 0 && r.status !== 'generating';
-const shotUrl = (r, f) => `/shots/${r.id}/${f}?v=${Date.parse(r.created_at)}`;
+const shotUrl = (r, f) => `/shots/${r.id}/${f}?v=${r.shots_v || Date.parse(r.created_at)}`;
 // 2 tab chính: "llm" (LLM tự thiết kế) và "generic" (template có sẵn, dự phòng). Ảnh cũ không có track → coi là generic.
 const TRACKS = [{ key: 'llm', label: 'LLM tự thiết kế' }, { key: 'generic', label: 'Template generic' }];
 const trackOf = (x) => x.track || 'generic';
@@ -310,6 +310,7 @@ function rowCard(r) {
       <div class="mt-auto pt-2 flex flex-wrap items-center gap-1.5">
         ${r.confidence != null && r.confidence >= thr() && editable ? chip('● Sẵn sàng', 'emerald') : ''}
         ${r.confidence != null ? chip(`Tự nhiên ${r.human_score}`, tone(r.human_score), 'Tin nhắn tự nhiên như người viết') + chip(`Hợp ngành ${r.fit_score}`, tone(r.fit_score), 'Demo khớp ngành và tên shop') : ''}
+        ${r.old_site_url ? chip('Làm mới web cũ', 'slate', r.old_site_url) : ''}
         ${hasShots(r) ? chip(`${pagesOf(r).length} màn hình · ${tracksOf(r).map((t) => t.key === 'llm' ? 'LLM' : 'generic').join(' + ')}`, 'slate', (r.page_list || []).map((p) => `${p.title} (${VIEW_VI[p.kind] || p.kind})`).join(' · ')) : ''}
         ${r.message && r.message !== r.message_original ? chip('Đã sửa', 'brand') : ''}
         ${r.status === 'sent' && r.sent_at ? chip('Gửi ' + new Date(r.sent_at).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }), 'slate') : ''}
@@ -421,6 +422,7 @@ function galleryHtml(r, pi, tk = mainTrack(r)) {
       ${r.brand?.colors ? Object.values(r.brand.colors).map((c) => `<span class="h-4 w-4 rounded-full ring-1 ring-black/10" style="background:${c}" title="${c}"></span>`).join('') : ''}</div>
     ${tabs.length > 1 ? `<div class="mb-3 inline-flex rounded-xl bg-slate-100 dark:bg-white/5 p-1">${tabs.map((t) => `<button data-track-tab="${t.key}" class="rounded-lg px-4 py-1.5 text-sm font-medium ${t.key === tk ? 'bg-white dark:bg-slate-800 shadow-soft text-ink dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'}">${t.label}</button>`).join('')}</div>` : ''}
     <div class="flex flex-wrap gap-1.5 mb-4">${pages.map((x, i) => `<button data-page-tab="${i}" data-track="${tk}" class="rounded-lg px-3 py-1.5 text-sm ${i === pi ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10'}">${esc(x.title)}<span class="ml-1.5 text-[11px] opacity-70">${VIEW_VI[x.view] || ''}</span></button>`).join('')}</div>
+    ${tk === 'llm' ? `<div class="mb-3 flex gap-2 text-sm"><a href="/view/${r.id}/${encodeURIComponent(p.slug)}" target="_blank" class="rounded-lg border border-slate-200 dark:border-white/10 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5">Mở HTML</a><a href="/edit/${r.id}/${encodeURIComponent(p.slug)}" target="_blank" class="rounded-lg border border-slate-200 dark:border-white/10 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-white/5">Sửa HTML / Prompt</a></div>` : ''}
     <div class="grid grid-cols-[1fr_auto] gap-3 items-start">
       ${full ? `<div class="relative group/s"><a href="${shotUrl(r, full.file)}" target="_blank"><img src="${shotUrl(r, full.file)}" class="w-full max-h-[460px] object-cover object-top rounded-xl ring-1 ring-slate-200 dark:ring-white/10"></a>
         <div class="absolute top-2 right-2 flex gap-1">${copyBtn(full)}</div><div class="mt-1 text-xs text-slate-500">${p.view === 'modal' ? 'Hộp thoại trên trang (desktop)' : p.view === 'section' ? 'Section (desktop)' : 'Toàn trang (desktop)'}</div></div>` : '<div></div>'}

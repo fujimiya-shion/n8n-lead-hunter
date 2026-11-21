@@ -281,10 +281,13 @@ BEGIN
       maps_url     = EXCLUDED.maps_url,
       last_job_id  = EXCLUDED.last_job_id,
       raw          = EXCLUDED.raw,
+      photo_url    = coalesce(nullif(EXCLUDED.raw->>'thumbnail', ''), nullif(EXCLUDED.raw->>'imageUrl', ''), b.photo_url),
       updated_at   = now()
     RETURNING id, (xmax = 0) INTO v_id, v_new;
 
     IF v_new THEN v_newc := v_newc + 1; END IF;
+    -- ảnh đại diện thật của shop (Google Maps) để dùng trong demo
+    UPDATE businesses SET photo_url = coalesce(nullif(it->>'thumbnail', ''), nullif(it->>'imageUrl', ''), photo_url) WHERE id = v_id;
 
     PERFORM add_contact(v_id, 'phone', coalesce(it->>'phoneUnformatted', it->>'phone'), 'maps');
     FOR s IN SELECT jarr(it->'phones')     LOOP PERFORM add_contact(v_id, 'phone',     s, 'maps_contacts'); END LOOP;

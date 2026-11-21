@@ -82,21 +82,31 @@ Hẹn gọi lại: điền cột `next_call_at` → lead hiện trên 📅 Lịc
 
 ## Demo web & tin nhắn chào hàng (Lead Studio)
 
-Service `studio` (thư mục `studio/`, Node + Playwright). Mỗi lượt chạy tạo cho `settings.outreach_per_run` (mặc định 10)
-lead `to_contact` có SĐT và điểm ≥ `outreach_min_lead_score`:
+Service `studio` (thư mục `studio/`, Node + Playwright). Mỗi lượt chạy tạo demo cho `settings.outreach_per_run` lead
+(mặc định 5). Lead được chọn khi ở trạng thái `to_contact`, có SĐT và có điểm ≥ `outreach_min_lead_score`. Không có ngành nào bị hardcode.
 
-1. **LLM viết nội dung** (JSON): tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật của shop) và chữ cho trang demo.
-   LLM **không viết HTML**: trang được dựng từ **bộ template chuẩn** theo 7 nhóm ngành (`studio/src/templates/`):
-   - `families.js`: cách nhận diện ngành, bảng màu, phong cách (sáng/tối), icon được phép, và **"skill" viết nội dung** cho từng nhóm.
-   - `render.js`: bố cục 12 phần (nav, hero, số liệu, dịch vụ, lý do chọn, quy trình, dự án, bảng giá, đánh giá, hỏi đáp, liên hệ, footer).
-     Mọi chữ đều được escape và giới hạn độ dài. Tên, SĐT, địa chỉ lấy từ DB.
-   - Xem trước toàn bộ template (nội dung mẫu, không tốn token): http://localhost:8082/preview
-2. **Playwright chụp** bản desktop (1440×900) và mobile (390px, tối đa 2.600px đầu trang, gửi chat vừa đẹp):
-   `http://localhost:8082/demo/<id>/`, `…/desktop.png`, `…/mobile.png`.
-3. **LLM chấm** `human` (tự nhiên như người viết) và `fit` (demo khớp ngành và tên shop), cộng thêm luật trừ điểm cụm sáo rỗng.
+1. **Lên kế hoạch** (JSON): LLM viết tin nhắn Zalo (3–5 câu, nhắc đúng 1 điểm thật của shop) và chọn nhận diện thương hiệu
+   (1 phong cách, màu, font cho cả bộ demo).
+2. **Tab "LLM tự thiết kế"**: LLM tự quyết định shop cần những màn hình nào. Màn hình đầu là trang chủ đầy đủ, các màn hình sau
+   là section hoặc modal. Mỗi màn hình được viết bằng HTML/Tailwind theo skill `studio/skills/frontend-design.md`.
+3. **Tab "Template generic"**: dựng bằng thư viện thành phần có sẵn (`studio/src/components.js`). Bật/tắt bằng
+   `settings.outreach_generic_track`:
+   - `fallback` (mặc định): chỉ chạy khi tab LLM hỏng hết. Cách này tiết kiệm khoảng 40–50% token.
+   - `on`: luôn chạy.
+   - `off`: tắt hẳn.
+4. **Ảnh**:
+   - **Ảnh thật của shop**: lấy ảnh đại diện trên Google Maps (gosom) hoặc ảnh bìa fanpage, lưu ở `businesses.photo_url`.
+     Nếu chưa có, studio tự tìm nhanh trên gosom (khoảng 1 phút). Ảnh này được đặt ở hero hoặc phần giới thiệu.
+   - **Ảnh stock**: lấy theo thứ tự Pixabay → Unsplash → Pexels → Openverse. Trước khi dùng, **MiMo xem ảnh thu nhỏ**
+     và loại các ảnh sai ngành. Bật/tắt bằng `outreach_image_check`; ngưỡng là `outreach_image_min_fit` (60).
+     Kết quả được cache theo ngành + từ khoá. Nếu không có ảnh đạt ngưỡng, trang dùng khối màu kèm hình minh hoạ.
+5. **Playwright chụp** từng màn hình: ảnh toàn trang desktop, ảnh mobile, và từng khối `data-section`.
+   Nếu không nhận ra khối nào, trang được cắt theo chiều cao màn hình. File HTML tạm bị xoá ngay sau khi chụp.
+   Xem trước thư viện thành phần (nội dung mẫu, không tốn token): http://localhost:8082/preview
+6. **LLM chấm** `human` (tự nhiên như người viết) và `fit` (demo khớp ngành và tên shop), cộng thêm luật trừ điểm cụm sáo rỗng.
    `confidence = 0.4 × điểm lead + 0.3 × human + 0.3 × fit`. Từ `outreach_ready_threshold` (80) trở lên được gắn nhãn **Sẵn sàng**.
    Confidence chỉ để **xếp hạng**, không dùng để tự gửi.
-4. **Trang duyệt** http://localhost:8082: sửa tin nhắn (tự lưu), duyệt hoặc bỏ qua hàng loạt,
+7. **Trang duyệt** http://localhost:8082: sửa tin nhắn (tự lưu), duyệt hoặc bỏ qua hàng loạt,
    copy SĐT, tin nhắn, ảnh (dán thẳng vào Zalo). Tự gửi xong bấm **Đã gửi** → lead chuyển `contacted`.
 
 LLM: mọi provider tương thích OpenAI (DeepSeek, Gemini, OpenRouter...). Cấu hình `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`
